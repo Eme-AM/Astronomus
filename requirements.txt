@@ -1,0 +1,18 @@
+# Data Science & Math
+pandas
+numpy
+scikit-learn
+torch
+torchvision
+
+# API & Web 
+fastapi
+uvicorn
+pydantic
+gradio
+
+# Utilities
+joblib
+requests
+matplotlib
+seaborn

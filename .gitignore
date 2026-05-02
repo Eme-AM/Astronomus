@@ -1,0 +1,13 @@
+# Datos y Modelos
+data/
+artifacts/*.pt
+artifacts/*.pkl
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# Jupyter
+.ipynb_checkpoints
