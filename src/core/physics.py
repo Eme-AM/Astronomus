@@ -1,18 +1,22 @@
-import numpy as np
+# src/core/physics.py
 
-class PlanetaryService:
-    @staticmethod
-    def calculate_density(mass, radius):
-        """Calcula densidad física: ρ [g/cm³] ≈ 5.51 * (M/M⊕) / (R/R⊕)³"""
-        if radius <= 0: return 0
-        return 5.51 * (mass) / (radius ** 3)
+def calc_stefan_boltzmann_temp(insolacion):
+    """
+    Calcula la Temperatura de Equilibrio (K) basada en la insolación estelar,
+    asumiendo un Albedo de Bond y Factor de Redistribución similares a la Tierra.
+    """
+    return 255 * (insolacion ** 0.25)
 
-    @staticmethod
-    def evaluate_habitability_rules(row):
-        """Reglas heurísticas (Expert System)"""
-        is_habitable = (
-            0.5 <= row['pl_rade'] <= 1.8 and
-            200 <= row['pl_eqt'] <= 320 and
-            0.2 <= row['pl_insol'] <= 1.8
-        )
-        return 1 if is_habitable else 0
+def calc_stefan_boltzmann_insol(temperatura):
+    """
+    Calcula la Insolación Estelar (relativa a la Tierra) requerida
+    para alcanzar una determinada Temperatura de Equilibrio.
+    """
+    return (temperatura / 255) ** 4
+
+def calc_densidad_planetaria(masa_tierra, radio_tierra):
+    """
+    Calcula la densidad del exoplaneta en g/cm³, tomando como base
+    la densidad media de la Tierra (5.51 g/cm³).
+    """
+    return 5.51 * (masa_tierra / (radio_tierra ** 3))
