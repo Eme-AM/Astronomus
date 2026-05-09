@@ -114,11 +114,9 @@ if df_nasa is not None: print(f"NASA:           {df_nasa.shape[0]} filas, {df_na
 if df_eu is not None:   print(f"Exoplanet.eu:   {df_eu.shape[0]} filas, {df_eu.shape[1]} columnas")
 if df_phl is not None:  print(f"PHL (Arecibo):  {df_phl.shape[0]} filas, {df_phl.shape[1]} columnas")
 
-print("\n Próximo paso: El Módulo de Procesamiento. Unificar las tres fuentes cruzando RA y DEC.")
-
 # =====================================================================
 # INSPECCIÓN DETALLADA POR FUENTE (HEAD + TODAS LAS COLUMNAS)
 # =====================================================================
-mostrar_estructura_fuente("NASA", df_nasa)
-mostrar_estructura_fuente("Exoplanet.eu", df_eu)
-mostrar_estructura_fuente("PHL (Arecibo)", df_phl)
+# mostrar_estructura_fuente("NASA", df_nasa)
+# mostrar_estructura_fuente("Exoplanet.eu", df_eu)
+# mostrar_estructura_fuente("PHL (Arecibo)", df_phl)
