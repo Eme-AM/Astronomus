@@ -1,8 +1,17 @@
 # Datos y Modelos
-/data/
-artifacts/*.pt
-artifacts/*.pkl
-artifacts/*.npy
+data/archive
+
+data/raw/*
+!data/raw/.gitkeep
+
+data/silver/*
+!data/silver/.gitkeep
+
+data/gold/*
+!data/gold/.gitkeep
+
+artifacts/*
+!artifacts/.gitkeep
 
 # Python
 __pycache__/
@@ -28,7 +37,13 @@ build/
 Thumbs.db
 
 # Logs y outputs
+reports/figures/*
+!reports/figures/.gitkeep
+
 *.log
 outputs/
 results/
-graphs/
+
+# Visualization
+src/visualization/archive/*
+src/visualization/plot_kde_imputation.py

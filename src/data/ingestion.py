@@ -1,122 +1,128 @@
-import pandas as pd
 import os
 import urllib.request
 import urllib.error
 import shutil
 import glob
+import logging
+import pandas as pd
 import kagglehub
 
-# Creamos el directorio data/ cruda si no existe para mantener el orden
-os.makedirs("data/raw", exist_ok=True)
+# 1. Configuración del Logger a nivel de móduloZ
+logger = logging.getLogger(__name__)
+#==========================
+# CONSTANTES GLOBALES
+# ==========================
+RUTA_RAW = "data/raw"
+NOMBRE_CSV_PHL = "phl_exoplanet_catalog_2019.csv"
 
-def mostrar_estructura_fuente(nombre_fuente, df, filas_head=5):
+# Función de descarga con manejo de errores y patrón Caché-Primero
+def descargar_catalogo(
+    nombre_fuente: str, 
+    archivo_salida: str, 
+    url: str | None = None, 
+    kaggle_dataset: str | None = None
+) -> pd.DataFrame | None:
     """
-    Muestra columnas y head completo de una fuente sin truncar.
+    Descarga un catálogo astronómico desde una URL directa o desde Kaggle.
+    Aplica patrón Caché-Primero para evitar descargas redundantes.
     """
-    if df is None:
-        print(f"\n[{nombre_fuente}] Sin datos disponibles para inspección.")
-        return
-
-    print(f"\n{'=' * 80}")
-    print(f"[{nombre_fuente}] Estructura de datos")
-    print(f"Total de columnas: {len(df.columns)}")
-    print("Columnas:")
-    print(df.columns.tolist())
-
-    print(f"\nHead ({filas_head} filas) con todas las columnas:")
-    with pd.option_context(
-        "display.max_columns", None,
-        "display.width", 300,
-        "display.max_colwidth", 120,
-    ):
-        print(df.head(filas_head))
-
-def descargar_catalogo(nombre_fuente, archivo_salida, url=None, kaggle_dataset=None):
-    """
-    Función de ingesta unificada. Descarga eficiente directo a disco duro 
-    (vía URL o Kaggle) antes de cargar en Pandas para optimizar memoria.
-    """
-    print(f"\n Iniciando ingesta: {nombre_fuente}")
-    
-    # 1. Caché Local (Escudo defensivo)
+    # Patrón Caché-Primero
     if os.path.exists(archivo_salida):
-        print(f"   ✓ Caché local encontrado. Leyendo {archivo_salida}...")
-        return pd.read_csv(archivo_salida, low_memory=False)
-    
-    print(f"  Archivo no encontrado en disco. Iniciando descarga...")
+        logger.info("✓ Caché local encontrado. Leyendo %s...", archivo_salida)
+        try:
+            return pd.read_csv(archivo_salida, low_memory=False)
+        except pd.errors.ParserError as e:
+            logger.error("El CSV en caché de %s está corrupto: %s", nombre_fuente, e)
+            return None
+
+    logger.info("Descargando catálogo de %s...", nombre_fuente)
+    os.makedirs(os.path.dirname(archivo_salida), exist_ok=True)
+
     try:
-        # 2. Descarga eficiente a disco (Patrón ELT puro)
-        if kaggle_dataset:
+        # Estrategia 1: Descarga por URL directa (ELT Puro)
+        if url:
+            urllib.request.urlretrieve(url, archivo_salida)
+            logger.info("✓ %s descargado exitosamente por HTTP.", nombre_fuente)
+            
+        # Estrategia 2: Descarga por API de Kaggle
+        elif kaggle_dataset:
+            
             # Rescate vía KaggleHub
             path_kaggle = kagglehub.dataset_download(kaggle_dataset)
             archivos_csv = glob.glob(os.path.join(path_kaggle, "*.csv"))
-            if not archivos_csv:
-                raise FileNotFoundError("No se encontró ningún archivo CSV en Kaggle.")
-            shutil.copy(archivos_csv[0], archivo_salida)
-            print("   ✓ Descarga de Kaggle completada exitosamente.")
             
-        elif url:
-            # Descarga HTTP directa a disco (No colapsa la RAM)
-            urllib.request.urlretrieve(url, archivo_salida)
-            print("   ✓ Descarga HTTP completada exitosamente.")
+            if not archivos_csv:
+                raise FileNotFoundError(f"No se encontró ningún archivo CSV en Kaggle: {path_kaggle}")
+            
+            # Mantenemos la auditoría: Selección de CSV determinista y segura
+            csv_objetivo = next(
+                (f for f in archivos_csv if NOMBRE_CSV_PHL in os.path.basename(f).lower()), 
+                None
+            )
+            
+            if csv_objetivo is None:
+                csvs_disp = [os.path.basename(f) for f in archivos_csv]
+                raise FileNotFoundError(
+                    f"No se encontró '{NOMBRE_CSV_PHL}' en Kaggle. Archivos disponibles: {csvs_disp}"
+                )
+                
+            shutil.copy(csv_objetivo, archivo_salida)
+            shutil.rmtree(path_kaggle)  # Limpieza
+            logger.info("✓ %s descargado y extraído exitosamente de Kaggle.", nombre_fuente)
             
         else:
             raise ValueError("Se debe proveer una 'url' o un 'kaggle_dataset'.")
 
-        # 3. Lectura a Pandas exclusivamente desde el archivo local
-        df = pd.read_csv(archivo_salida, low_memory=False)
-        print(f"   ✓ ¡Éxito! Datos ingestados al Data Lake: {len(df)} planetas.")
-        return df
-        
+        return pd.read_csv(archivo_salida, low_memory=False)
+
+    # 2. Manejo de Errores Específicos e Informativos
     except urllib.error.HTTPError as e:
-        print(f"   ERROR HTTP {e.code}: El servidor de {nombre_fuente} rechazó la conexión.")
-    except ImportError:
-        print("   ERROR: Falta instalar kagglehub (pip install kagglehub)")
+        logger.error("HTTP %s al descargar %s. ¿Está caído el servidor?", e.code, nombre_fuente)
+    except urllib.error.URLError as e:
+        logger.error("Sin conectividad de red para %s: %s", nombre_fuente, e.reason)
+    except pd.errors.ParserError as e:
+        logger.error("El CSV descargado de %s está corrupto: %s", nombre_fuente, e)
+    except OSError as e:
+        logger.error("Error de disco al manipular %s: %s", nombre_fuente, e)
     except Exception as e:
-        print(f"   ERROR INESPERADO al procesar {nombre_fuente}: {str(e)}")
-    
+        # Fallback solo para errores verdaderamente inesperados
+        logger.critical("Error crítico e inesperado al procesar %s: %s", nombre_fuente, e)
+        
     return None
 
-# =====================================================================
-# 1. FUENTE PRINCIPAL: NASA Exoplanet Archive (70 MB RAW DATA)
-# =====================================================================
-url_nasa = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=select+*+from+pscomppars&format=csv"
-df_nasa = descargar_catalogo(
-    nombre_fuente="NASA", 
-    archivo_salida="data/raw/nasa_exoplanets.csv", 
-    url=url_nasa
-)
+# Función orquestadora de la ingesta de datos
+def ejecutar_ingesta():
+    """Función orquestadora de la ingesta de datos."""
+    logger.info("Iniciando Capa Bronce: Ingesta de catálogos raw...")
+    
+    # 1. NASA Exoplanet Archive
+    df_nasa = descargar_catalogo(
+        nombre_fuente="NASA",
+        archivo_salida=f"{RUTA_RAW}/nasa_exoplanets.csv",
+        url="https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=select+*+from+pscomppars&format=csv"
+    )
+    
+    # 2. Exoplanet.eu (París)
+    df_eu = descargar_catalogo(
+        nombre_fuente="Exoplanet.eu",
+        archivo_salida=f"{RUTA_RAW}/eu_exoplanets.csv",
+        url="https://exoplanet.eu/catalog/csv"
+    )
+    
+    # 3. PHL (Kaggle)
+    df_phl = descargar_catalogo(
+        nombre_fuente="PHL (Arecibo)",
+        archivo_salida=f"{RUTA_RAW}/phl_exoplanets.csv",
+        kaggle_dataset="chandrimad31/phl-exoplanet-catalog"
+    )
+    
+    logger.info("Capa Bronce finalizada con éxito.")
 
-# =====================================================================
-# 2. FUENTE SECUNDARIA: The Extrasolar Planets Encyclopaedia (Europa)
-# =====================================================================
-url_eu = "http://exoplanet.eu/catalog/csv"
-df_eu = descargar_catalogo(
-    nombre_fuente="Exoplanet.eu", 
-    archivo_salida="data/raw/eu_exoplanets.csv", 
-    url=url_eu
-)
-
-# =====================================================================
-# 3. FUENTE TERCIARIA: PHL - Habitable Exoplanets Catalog
-# =====================================================================
-df_phl = descargar_catalogo(
-    nombre_fuente="PHL (Arecibo)", 
-    archivo_salida="data/raw/phl_exoplanets.csv", 
-    kaggle_dataset="chandrimad31/phl-exoplanet-catalog"
-)
-
-# =====================================================================
-# REPORTE DE INGESTA
-# =====================================================================
-print("\n--- REPORTE DE DATA LAKE ---")
-if df_nasa is not None: print(f"NASA:           {df_nasa.shape[0]} filas, {df_nasa.shape[1]} columnas")
-if df_eu is not None:   print(f"Exoplanet.eu:   {df_eu.shape[0]} filas, {df_eu.shape[1]} columnas")
-if df_phl is not None:  print(f"PHL (Arecibo):  {df_phl.shape[0]} filas, {df_phl.shape[1]} columnas")
-
-# =====================================================================
-# INSPECCIÓN DETALLADA POR FUENTE (HEAD + TODAS LAS COLUMNAS)
-# =====================================================================
-# mostrar_estructura_fuente("NASA", df_nasa)
-# mostrar_estructura_fuente("Exoplanet.eu", df_eu)
-# mostrar_estructura_fuente("PHL (Arecibo)", df_phl)
+if __name__ == "__main__":
+    # Configuramos el formato visual del logger SOLO si se ejecuta este script directamente
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%H:%M:%S'
+    )
+    ejecutar_ingesta()
