@@ -1,68 +1,84 @@
-import os
+# reports/plot_pca_projection.py
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.decomposition import PCA
 
-DIR_GOLD = "data/gold"
-DIR_FIGURAS = "reports/figures"
-os.makedirs(DIR_FIGURAS, exist_ok=True)
+from config_plots import configurar_estilo, cargar_gold, guardar_figura
 
-sns.set_theme(style="white", context="paper", font_scale=1.2)
+# Estilo aplicado a nivel de módulo — consistente con el resto de la suite
+configurar_estilo()
 
-def generar_pca():
-    print("Cargando tensores de la Capa Oro para reducción de dimensionalidad...")
+MAPA_CLASES = {
+    0: '0 - Inhóspito',
+    1: '1 - Exótico',
+    2: '2 - Tierra 2.0 (Grial)',
+}
+COLORES_CLASES = {
+    '0 - Inhóspito':          '#e0e0e0',
+    '1 - Exótico':            '#3498db',
+    '2 - Tierra 2.0 (Grial)': '#f1c40f',
+}
 
-    ruta_datos = f"{DIR_GOLD}/X_train.csv"
-    
-    if not os.path.exists(ruta_datos):
-        print(f"Error: No se encontró el dataset en {ruta_datos}.")
-        print("  Por favor, ejecutá primero el pipeline de datos (ingestion.py, processing.py y preparation.py) para generar este archivo localmente.")
-        return
 
-    X_train = pd.read_csv(f"{DIR_GOLD}/X_train.csv")
-    y_train = pd.read_csv(f"{DIR_GOLD}/y_train.csv")
+def generar_pca() -> None:
+    """
+    Proyecta el espacio paramétrico de la Capa Oro a 2D mediante PCA.
+    Colorea cada punto según su clase target (Inhóspito / Exótico / Grial).
+    """
+    X_train = cargar_gold("X_train.csv")
+    y_train = cargar_gold("y_train.csv")
 
-    print("Calculando Componentes Principales (12D -> 2D)...")
-    pca = PCA(n_components=2, random_state=42)
+    n_features = X_train.shape[1]
+    print(f"Calculando Componentes Principales ({n_features}D → 2D)...")
+
+    pca         = PCA(n_components=2, random_state=42)
     componentes = pca.fit_transform(X_train)
-    
-    df_pca = pd.DataFrame(data=componentes, columns=['Componente 1', 'Componente 2'])
-    y_train['target_class'] = y_train['target_class'].astype(int)
-    df_pca['Clase'] = y_train['target_class'].map({
-        0: '0 - Inhóspito', 
-        1: '1 - Exótico', 
-        2: '2 - Tierra 2.0 (Grial)'
-    })
+    var         = pca.explained_variance_ratio_
 
-    # Orden para el pintado (los últimos se dibujan arriba de todo)
+    # FIX AUDITORÍA: reset_index evita NaN por misalignment entre
+    # el índice no-consecutivo de y_train (producto del train_test_split)
+    # y el índice 0-based del DataFrame de componentes PCA.
+    y_train = y_train.reset_index(drop=True)
+    y_train['target_class'] = y_train['target_class'].astype(int)
+
+    df_pca          = pd.DataFrame(componentes, columns=['Componente 1', 'Componente 2'])
+    df_pca['Clase'] = y_train['target_class'].map(MAPA_CLASES)
+
+    # Validación: detectar valores de clase no contemplados en el mapa
+    nans_post_map = df_pca['Clase'].isna().sum()
+    if nans_post_map > 0:
+        clases_huerfanas = y_train.loc[df_pca['Clase'].isna(), 'target_class'].unique()
+        raise ValueError(
+            f"El mapa de clases no cubre {nans_post_map} filas. "
+            f"Valores sin mapear: {clases_huerfanas}. "
+            f"Actualizá MAPA_CLASES en {__file__}."
+        )
+
+    # Las clases raras (Grial) se dibujan al final para no quedar tapadas
     df_pca = df_pca.sort_values('Clase')
 
     plt.figure(figsize=(11, 8))
-    colores = {'0 - Inhóspito': '#e0e0e0', '1 - Exótico': '#3498db', '2 - Tierra 2.0 (Grial)': '#f1c40f'}
-    orden_clases = ['0 - Inhóspito', '1 - Exótico', '2 - Tierra 2.0 (Grial)']
-
     sns.scatterplot(
-        data=df_pca, x='Componente 1', y='Componente 2', hue='Clase',
-        palette=colores, hue_order=orden_clases, s=65, 
-        alpha=0.85, edgecolor='black', linewidth=0.3
+        data=df_pca,
+        x='Componente 1', y='Componente 2',
+        hue='Clase', palette=COLORES_CLASES,
+        hue_order=list(MAPA_CLASES.values()),
+        s=65, alpha=0.85, edgecolor='black', linewidth=0.3,
     )
 
-    varianza_explicada = sum(pca.explained_variance_ratio_) * 100
-    plt.title(f'Proyección 2D del Espacio Paramétrico (PCA)\nVarianza retenida: {varianza_explicada:.1f}%', 
-              fontsize=16, fontweight='bold', pad=20)
-    plt.xlabel(f'Componente Principal 1 ({pca.explained_variance_ratio_[0]*100:.1f}%)', fontsize=12)
-    plt.ylabel(f'Componente Principal 2 ({pca.explained_variance_ratio_[1]*100:.1f}%)', fontsize=12)
-    
-    # Leyenda anclada fuera del gráfico
+    plt.title(
+        f'Proyección 2D del Espacio Paramétrico (PCA)\n'
+        f'Varianza retenida: {sum(var)*100:.1f}%',
+        fontweight='bold', pad=20,
+    )
+    plt.xlabel(f'Componente Principal 1 ({var[0]*100:.1f}%)')
+    plt.ylabel(f'Componente Principal 2 ({var[1]*100:.1f}%)')
     plt.legend(title='Target Class', bbox_to_anchor=(1.02, 1), loc='upper left')
-    sns.despine()
+    sns.despine()  # ← consistente con toda la suite
 
-    ruta_salida = f'{DIR_FIGURAS}/eda_04_pca_projection.png'
-    plt.tight_layout()
-    plt.savefig(ruta_salida, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f" ✓ Gráfico guardado en: {ruta_salida}")
+    guardar_figura('eda_04_pca_projection.png')
+
 
 if __name__ == "__main__":
     generar_pca()

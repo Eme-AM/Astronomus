@@ -1,26 +1,13 @@
-import os
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-
-DIR_SILVER = "data/silver"
-DIR_FIGURAS = "reports/figures"
-os.makedirs(DIR_FIGURAS, exist_ok=True)
-
-sns.set_theme(style="white", context="paper", font_scale=1.2)
+from config_plots import configurar_estilo, cargar_silver, guardar_figura
 
 def generar_heatmap():
     print("Cargando Capa Plata para análisis de correlación...")
+    configurar_estilo()
 
-    ruta_datos = f"{DIR_SILVER}/data_lake_consolidado.csv"
-    
-    if not os.path.exists(ruta_datos):
-        print(f"Error: No se encontró el dataset en {ruta_datos}.")
-        print("  Por favor, ejecutá primero el pipeline de datos (ingestion.py y processing.py) para generar este archivo localmente.")
-        return
-
-    v4 = pd.read_csv(f"{DIR_SILVER}/data_lake_consolidado.csv", low_memory=False)
+    v4 = cargar_silver("data_lake_consolidado.csv")
     
     columnas_fisicas = [
         'pl_orbper', 'pl_orbeccen', 'pl_bmasse', 'pl_rade', 
@@ -42,14 +29,9 @@ def generar_heatmap():
 
     plt.title('Matriz de Correlación de Atributos Exoplanetarios\n(Dataset Silver)', 
               fontsize=16, fontweight='bold', pad=20)
-    plt.xticks(rotation=45, ha='right', fontsize=11)
-    plt.yticks(rotation=0, fontsize=11)
 
-    ruta_salida = f'{DIR_FIGURAS}/eda_01_matriz_correlacion.png'
-    plt.tight_layout()
-    plt.savefig(ruta_salida, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f" ✓ Gráfico guardado en: {ruta_salida}")
+    guardar_figura('eda_01_heatmap_correlacion.png')
+    print(" ✓ Gráfico guardado en: reports/figures/eda_01_heatmap_correlacion.png")
 
 if __name__ == "__main__":
     generar_heatmap()
