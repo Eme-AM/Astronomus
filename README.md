@@ -16,12 +16,11 @@
 
 ## Arquitectura de Datos (Patrón Medallón)
 
-El flujo de datos del proyecto sigue un paradigma **ELT (Extract, Load, Transform)** estructurado en tres capas para garantizar la trazabilidad y calidad de la información:
+El flujo de datos sigue un paradigma **ELT (Extract, Load, Transform)** estructurado en tres capas estrictas para garantizar la trazabilidad y sanidad de la información:
 
-1. **Capa Bronce (Raw):** Ingesta cruda y directa a disco físico mediante `urllib` y `kagglehub`. Se preservan los metadatos y la varianza original sin intervención temprana de transformadores que puedan corromper formatos.
-2. **Capa Plata (Processed):** Consolidación multi-fuente mediante resolución de entidades espaciales, imputación termodinámica y estadística, generando un único catálogo maestro de grado científico.
-3. **Capa Oro (Artifacts):** Vectores y tensores matemáticamente escalados listos para su inyección en la Red Neuronal (*En desarrollo*).
-
+1. **Capa Bronce (`data/raw/`):** Ingesta cruda y directa a disco físico (*Import-Safe*). Se preservan los metadatos y la varianza original sin intervención temprana.
+2. **Capa Plata (`data/silver/`):** Consolidación multi-fuente mediante resolución espacial 3D, imputación termodinámica y algoritmos de bosque aleatorio, generando un único catálogo maestro libre de valores nulos.
+3. **Capa Oro (`data/gold/`):** Vectores matemáticos procesados. Incluye *Target Engineering* multiclase, partición estratificada y escalado robusto, listos para la Red Neuronal.
 ---
 
 ## Fuentes de Datos Integradas
@@ -37,32 +36,37 @@ Para lograr una validación cruzada y enriquecer el espacio de características 
 ## Pipeline de Procesamiento y Data Quality
 
 ### 1. Entity Resolution Espacial (Fuzzy Matching)
-Debido a la carencia de una nomenclatura exoplanetaria universal (ej. *Kepler-186 f* vs *KOI-571.05*), se implementó un algoritmo de búsqueda espacial **K-D Tree** (`scipy.spatial.cKDTree`). Se utilizan las coordenadas celestes (Ascensión Recta y Declinación) como llave primaria universal, logrando cruces instantáneos con un radio de tolerancia microscópico ($0.01^\circ$).
+Ante la carencia de una nomenclatura universal, se implementó un algoritmo **K-D Tree** (`scipy.spatial.cKDTree`). Para evitar la distorsión polar de las coordenadas celestes (Ascensión Recta y Declinación), se proyectan a vectores unitarios 3D utilizando la **Distancia de Cuerda**. El cruce resuelve colisiones dinámicamente mediante una política de *Closest-Wins*, asegurando la asignación del gemelo espacial más preciso dentro de un margen de $0.01^\circ$.
 
 ### 2. Imputación Híbrida de 3 Niveles
-Se rechazó la imputación por fuerza bruta (relleno con medianas globales) para evitar la alteración de la varianza astrofísica. En su lugar, se diseñó un rescate de datos en tres fases:
-*   **Nivel 1 (Cross-Filling):** Inyección directa de observaciones empíricas cruzadas desde catálogos europeos.
-*   **Nivel 2 (Termodinámica):** Deducción de Temperatura de Equilibrio e Insolación mediante derivaciones de la Ley de Stefan-Boltzmann ($T_{eq} = 255 \cdot S^{1/4}$) y cálculos de densidad planetoide.
-*   **Nivel 3 (Machine Learning):** Implementación del algoritmo **MICE** (*Multiple Imputation by Chained Equations*) a través de un `IterativeImputer` impulsado por un ensamble de `ExtraTreesRegressor` para inferir variables complejas (ej. Edad Estelar) preservando correlaciones no lineales.
+Se rechazó la imputación por fuerza bruta para evitar la alteración de la varianza astrofísica. El rescate de datos opera en tres fases:
+* **Fase Empírica (Cross-Filling):** Inyección de observaciones cruzadas desde catálogos europeos.
+* **Fase Determinista (Física):** Deducción exacta de la Temperatura de Equilibrio e Insolación mediante derivaciones de la Ley de Stefan-Boltzmann ($T_{eq} \propto S^{1/4}$).
+* **Fase Estocástica (Machine Learning):** Algoritmo **MICE** (*Multiple Imputation by Chained Equations*) impulsado por un `ExtraTreesRegressor`, mitigando el sobreajuste mediante divisiones extremas aleatorias.
+
+### 3. Target Engineering: El Súper Target
+La clasificación de habitabilidad no se basa en un solo parámetro plano. Se construyó un objetivo multiclase combinando el estado de la Zona Habitable (*Goldilocks Zone*) y un exigente umbral en el *Earth Similarity Index* ($ESI \ge 0.80$), categorizando el universo en: `Mundo Inhóspito`, `Mundo Exótico` y el escaso `Tierra 2.0 (Grial)`.
 
 ---
 
 ## Estructura del Repositorio
-
-El código está estructurado bajo principios de mantenibilidad y modularidad:
 ```text
 ASTRONOMUS/
-├── artifacts/            # Modelos entrenados y escaladores (ignorados en git)
-├── data/                 # Data Lake local
+├── artifacts/            # Modelos entrenados y escaladores (.pkl, .pth)
+├── data/                 # Data Lake Local (Ignorado en versionado)
+│   ├── archive/          # Históricos y snapshots para auditoría
 │   ├── raw/              # Capa Bronce: Descargas intocables
-│   └── processed/        # Capa Plata: DataFrames consolidados
-├── notebooks/            # Jupyter Notebooks para Análisis Exploratorio (EDA)
-├── src/                  # Código fuente de la aplicación
-│   ├── api/              # Endpoints para despliegue futuro (main_api.py)
+│   ├── silver/           # Capa Plata: Data Lake consolidado
+│   └── gold/             # Capa Oro: Tensores escalados y estratificados
+├── reports/
+│   └── figures/          # Gráficos de calidad de publicación (EDA, PCA, KDE)
+├── src/
+│   ├── api/              # Endpoints para despliegue futuro (FastAPI)
 │   ├── core/             # Fórmulas y leyes astrofísicas (physics.py)
-│   ├── data/             # Módulos definitivos de ingesta (ingestion.py)
-│   └── models/           # Arquitectura de la Red Neuronal (architecture.py)
-├── tests/                # Scripts de prueba y experimentación (Multi/ y Simple/)
-├── .gitignore            # Reglas de exclusión (data/, pycache, IDEs)
-├── requirements.txt      # Dependencias del proyecto
-└── README.md             # Documentación principal
+│   ├── data/             # Pipeline ELT (ingestion.py, processing.py, preparation.py)
+│   ├── models/           # Topología de la Red Neuronal Profunda (architecture.py)
+│   └── visualization/    # Suite de scripts de diagnóstico y auditoría MLOps
+├── tests/                # Scripts de prueba y experimentación
+├── .gitignore            # Reglas de exclusión (Data, Artifacts, PyCache)
+├── requirements.txt      # Dependencias
+└── README.md             # Documentación
