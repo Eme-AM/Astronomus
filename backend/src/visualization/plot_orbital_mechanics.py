@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
-from config_plots import configurar_estilo, cargar_silver, guardar_figura
+from backend.src.visualization.config_plots import configurar_estilo, cargar_silver, guardar_figura
 
 def generar_auditoria_orbital():
     print("Cargando Capa Plata para análisis de Mecánica Orbital...")

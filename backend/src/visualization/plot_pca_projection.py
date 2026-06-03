@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.decomposition import PCA
 
-from config_plots import configurar_estilo, cargar_gold, guardar_figura
+from backend.src.visualization.config_plots import configurar_estilo, cargar_gold, guardar_figura
 
 # Estilo aplicado a nivel de módulo — consistente con el resto de la suite
 configurar_estilo()

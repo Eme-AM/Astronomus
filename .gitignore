@@ -1,17 +1,17 @@
 # Datos y Modelos
-data/archive
+backend/data/archive
 
-data/raw/*
-!data/raw/.gitkeep
+backend/data/raw/*
+!backend/data/raw/.gitkeep
 
-data/silver/*
-!data/silver/.gitkeep
+backend/data/silver/*
+!backend/data/silver/.gitkeep
 
-data/gold/*
-!data/gold/.gitkeep
+backend/data/gold/*
+!backend/data/gold/.gitkeep
 
-artifacts/*
-!artifacts/.gitkeep
+backend/artifacts/*
+!backend/artifacts/.gitkeep
 
 # Python
 __pycache__/
@@ -37,13 +37,13 @@ build/
 Thumbs.db
 
 # Logs y outputs
-reports/figures/*
-!reports/figures/.gitkeep
+backend/reports/figures/*
+!backend/reports/figures/.gitkeep
 
-*.log
-outputs/
-results/
+backend/*.log
+backend/outputs/
+backend/results/
 
 # Visualization
-src/visualization/archive/*
-src/visualization/plot_kde_imputation.py
+backend/src/visualization/archive/*
+backend/src/visualization/plot_kde_imputation.py
