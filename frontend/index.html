@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astronomus — Catálogo 3D de Exoplanetas</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@200;400&display=swap" rel="stylesheet">
+
+    <style>
+        /* =========================================
+           VARIABLES ESTÉTICAS (Tema Espacio Profundo)
+           ========================================= */
+        :root {
+            --gold: #f1c40f;
+            --cyan: #00d4ff;
+            --red: #e74c3c;
+            --border: rgba(255, 255, 255, 0.06);
+            --mono: 'Share Tech Mono', monospace;
+            --sans: 'Exo 2', sans-serif;
+        }
+
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: var(--mono);
+            color: #fff;
+            cursor: crosshair;
+        }
+
+        canvas { display: block; }
+
+        /* --- PANTALLA DE CARGA --- */
+        #overlay {
+            position: fixed; inset: 0;
+            background: #000;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 20px;
+            z-index: 100; transition: opacity 0.8s ease;
+        }
+        #overlay.fade-out { opacity: 0; pointer-events: none; }
+
+        .logo { font-family: var(--sans); font-weight: 200; font-size: 42px; letter-spacing: 14px; text-transform: uppercase; }
+        .logo span { color: var(--gold); }
+        .tagline { font-size: 14px; letter-spacing: 3px; color: rgba(255,255,255,0.8); text-transform: uppercase; }
+        
+        #status-msg { font-size: 12px; letter-spacing: 2px; color: rgba(255,255,255,0.8); min-height: 18px; }
+        .progress-track { width: 240px; height: 1px; background: rgba(255,255,255,0.08); position: relative; }
+        .progress-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); width: 0%; transition: width 0.4s ease; box-shadow: 0 0 8px var(--gold); }
+
+        /* --- INTERFAZ HUD (Heads-Up Display) --- */
+        #hud, #legend, #controls-hint {
+            position: fixed; opacity: 0; transition: opacity 1s ease 0.4s; pointer-events: none;
+        }
+        #hud.show, #legend.show, #controls-hint.show { opacity: 1; }
+
+        #hud { top: 24px; left: 24px; }
+        .hud-title { font-family: var(--sans); font-weight: 200; font-size: 22px; letter-spacing: 6px; color: var(--gold); margin-bottom: 12px; }
+        .hud-row { display: flex; gap: 14px; align-items: baseline; font-size: 14px; letter-spacing: 2px; color: rgba(255,255,255,0.8); margin-bottom: 5px; }
+        .hud-row .val { color: rgba(255,255,255,0.8); font-size: 14px; }
+        .hud-row .grial { color: var(--gold); font-size: 14px; }
+        .hud-divider { width: 120px; height: 1px; background: var(--border); margin: 10px 0; }
+
+        /* --- LEYENDA TÉRMICA --- */
+        #legend { bottom: 24px; left: 24px; transition-delay: 0.5s; }
+        .legend-title { font-size: 16px; letter-spacing: 3px; color: rgba(255,255,255,0.8); margin-bottom: 8px; }
+        .legend-bar { width: 160px; height: 4px; border-radius: 2px; box-shadow: 0 0 6px rgba(255,255,255,0.8);
+                      background: linear-gradient(to right, #ff6600, #ffaa44, #ffe566, #ffffff, #aaddff); }
+        .legend-labels { display: flex; justify-content: space-between; font-size: 16px; letter-spacing: 1px; color: rgba(255,255,255,0.8); margin-top: 4px; }
+        .legend-grial { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 16px; letter-spacing: 2px; color: rgba(255,255,255,0.8); }
+        .grial-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+
+        #controls-hint { bottom: 24px; right: 24px; font-size: 13px; letter-spacing: 2px; color: rgba(255,255,255,0.8); text-align: right; line-height: 2.2; transition-delay: 0.7s; }
+
+        /* --- TOOLTIP INTERACTIVO --- */
+        #tooltip {
+            position: fixed; background: rgba(0,0,0,0.85); border: 1px solid var(--border); padding: 8px 12px;
+            font-size: 10px; letter-spacing: 1px; color: rgba(255,255,255,0.8); pointer-events: none;
+            display: none; white-space: nowrap; backdrop-filter: blur(4px); z-index: 200;
+        }
+        #tooltip .t-name { color: var(--gold); font-size: 11px; margin-bottom: 3px; }
+
+        /* --- EFECTOS DE POST-PROCESADO CSS --- */
+        #scanlines { position: fixed; inset: 0; pointer-events: none; z-index: 50;
+                     background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px); }
+        #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 49;
+                    background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.5) 100%); }
+    </style>
+</head>
+
+<body>
+    <div id="scanlines"></div>
+    <div id="vignette"></div>
+
+    <div id="overlay">
+        <div class="logo"><span>ASTRO</span>NOMUS</div>
+        <div class="tagline">Catálogo de Exoplanetas · Proyecto UADE</div>
+        <div id="status-msg">Inicializando motores WebGL...</div>
+        <div class="progress-track"><div class="progress-fill" id="prog"></div></div>
+    </div>
+
+    <div id="hud">
+        <div class="hud-title">EXOPLANET CATALOG</div>
+        <div class="hud-row">TOTAL <span class="val" id="h-total">—</span></div>
+        <div class="hud-row">ETIQUETADOS <span class="val" id="h-labeled">—</span></div>
+        <div class="hud-divider"></div>
+        <div class="hud-row">★ TIERRA 2.0 <span class="grial" id="h-griales">—</span></div>
+    </div>
+
+    <div id="legend">
+        <div class="legend-title">TEMPERATURA ESTELAR</div>
+        <div class="legend-bar"></div>
+        <div class="legend-labels"><span>2500K</span><span>M · K · G · F · A</span><span>10000K</span></div>
+        <div class="legend-grial"><div class="grial-dot"></div><span>GRIAL — TIERRA 2.0 (ESI ≥ 0.80)</span></div>
+    </div>
+
+    <div id="controls-hint">ARRASTRAR · ROTAR<br>SCROLL · ZOOM<br>HOVER · IDENTIFICAR</div>
+
+    <div id="tooltip">
+        <div class="t-name" id="tt-name"></div>
+        <div id="tt-teff"></div>
+        <div id="tt-rade"></div>
+        <div id="tt-grial" style="margin-top: 4px; letter-spacing: 2px; font-size: 9px;"></div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.162.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.162.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // Conexión dinámica (Localhost si se abre directo, o ruta relativa si sirve FastAPI)
+        const API_URL = window.location.protocol === 'file:' ? 'http://localhost:8000/api/exoplanets' : '/api/exoplanets';
+
+        // ==========================================
+        // MOTOR GRÁFICO (Three.js Setup)
+        // ==========================================
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(innerWidth, innerHeight);
+        renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 2000);
+        camera.position.set(0, 40, 220);
+
+        // Esfera de referencia tenue
+        scene.add(new THREE.Mesh(
+            new THREE.SphereGeometry(108, 36, 18),
+            new THREE.MeshBasicMaterial({ color: 0x0a0a14, wireframe: true, transparent: true, opacity: 0.07 })
+        ));
+
+        // Controles de cámara
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; controls.dampingFactor = 0.05;
+        controls.minDistance = 15; controls.maxDistance = 700;
+        let autoRotate = true; let autoRotateY = 0;
+        controls.addEventListener('start', () => { autoRotate = false; });
+
+        // ==========================================
+        // FÍSICA A COLOR (Leyes de Radiación)
+        // ==========================================
+        function tempToRGB(teff) {
+            const t = Math.max(2500, Math.min(10000, teff || 5778));
+            let r, g, b;
+            if (t < 3700) { r=1; g=0.3+(t-2500)/4167; b=0; } // Enanas Rojas (M)
+            else if (t < 5200) { r=1; g=0.6+(t-3700)/7500; b=0.05; } // Naranjas (K)
+            else if (t < 6000) { r=1; g=0.9+(t-5200)/8000; b=0.4+(t-5200)/2000; } // Amarillas (G - Sol)
+            else if (t < 7500) { r=1; g=1; b=0.65+(t-6000)/4286; } // Blancas (F)
+            else { r=0.75+(10000-t)/10000; g=0.88; b=1; } // Azules (A)
+            return [Math.min(1,r), Math.min(1,g), Math.min(1,b)];
+        }
+
+        // ==========================================
+        // GESTIÓN DE DATOS Y RENDERIZADO
+        // ==========================================
+        const raycaster = new THREE.Raycaster(); raycaster.params.Points.threshold = 1.2;
+        const mouse = new THREE.Vector2();
+        let pointsRef = null, grialPointsRef = null;
+        let catalog = { names: [], temps: [], radii: [], targets: [] };
+
+        async function loadCatalog() {
+            const setStatus = (msg, pct) => { document.getElementById('status-msg').textContent = msg; document.getElementById('prog').style.width = pct + '%'; };
+            setStatus('Conectando con la API de Astronomus...', 10);
+
+            try {
+                const res = await fetch(API_URL);
+                if (!res.ok) throw new Error("API Inaccesible.");
+                setStatus('Descargando Data Lake Espacial...', 40);
+                const data = await res.json();
+
+                catalog = { names: data.names, temps: data.temperatures, radii: data.radii, targets: data.target_classes };
+                
+                setStatus(`Procesando ${data.meta.total} cuerpos celestes...`, 70);
+                await new Promise(r => setTimeout(r, 50)); // Respirar UI
+
+                // Separación eficiente en memoria
+                const normIdx = [], grialIdx = [];
+                data.target_classes.forEach((tc, i) => tc === 2 ? grialIdx.push(i) : normIdx.push(i));
+
+                // 1. NUBE DE PLANETAS ESTÁNDAR
+                const normPos = new Float32Array(normIdx.length * 3);
+                const normCol = new Float32Array(normIdx.length * 3);
+                normIdx.forEach((src, dst) => {
+                    normPos[dst*3] = data.positions[src*3]; normPos[dst*3+1] = data.positions[src*3+1]; normPos[dst*3+2] = data.positions[src*3+2];
+                    const [r, g, b] = tempToRGB(data.temperatures[src]);
+                    normCol[dst*3] = r; normCol[dst*3+1] = g; normCol[dst*3+2] = b;
+                });
+
+                const normGeo = new THREE.BufferGeometry();
+                normGeo.setAttribute('position', new THREE.BufferAttribute(normPos, 3));
+                normGeo.setAttribute('color', new THREE.BufferAttribute(normCol, 3));
+                pointsRef = new THREE.Points(normGeo, new THREE.PointsMaterial({ vertexColors: true, size: 0.85, sizeAttenuation: true, transparent: true, opacity: 0.88 }));
+                pointsRef.userData.indexMap = normIdx;
+                scene.add(pointsRef);
+
+                // 2. NUBE DE GRIALES (Tierras 2.0)
+                if (grialIdx.length > 0) {
+                    const gPos = new Float32Array(grialIdx.length * 3);
+                    grialIdx.forEach((src, dst) => { gPos[dst*3] = data.positions[src*3]; gPos[dst*3+1] = data.positions[src*3+1]; gPos[dst*3+2] = data.positions[src*3+2]; });
+                    const gGeo = new THREE.BufferGeometry(); gGeo.setAttribute('position', new THREE.BufferAttribute(gPos, 3));
+                    
+                    grialPointsRef = new THREE.Points(gGeo, new THREE.PointsMaterial({ color: 0xf1c40f, size: 5.5, sizeAttenuation: true }));
+                    grialPointsRef.userData.indexMap = grialIdx;
+                    scene.add(grialPointsRef);
+                    scene.add(new THREE.Points(gGeo, new THREE.PointsMaterial({ color: 0xf39c12, size: 11.0, sizeAttenuation: true, transparent: true, opacity: 0.18 }))); // Halo
+                }
+
+                // Actualizar Textos HUD
+                document.getElementById('h-total').textContent = data.meta.total.toLocaleString('es-AR') + ' EXOPLANETAS';
+                document.getElementById('h-labeled').textContent = data.meta.labeled.toLocaleString('es-AR');
+                document.getElementById('h-griales').textContent = data.meta.griales + ' CANDIDATOS';
+
+                setStatus('Catálogo inicializado', 100);
+                setTimeout(() => { 
+                    document.getElementById('overlay').classList.add('fade-out'); 
+                    ['hud', 'legend', 'controls-hint'].forEach(id => document.getElementById(id).classList.add('show'));
+                }, 500);
+
+            } catch (error) {
+                setStatus('ERROR CRÍTICO: No se pudo cargar el catálogo.', 0);
+            }
+        }
+
+        // ==========================================
+        // SISTEMA DE INTERACCIÓN (Raycasting)
+        // ==========================================
+        const tooltip = document.getElementById('tooltip');
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = (e.clientX / innerWidth) * 2 - 1; mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+            tooltip.style.left = (e.clientX + 14) + 'px'; tooltip.style.top = (e.clientY - 10) + 'px';
+        });
+
+        function renderHover() {
+            if (!pointsRef) return;
+            raycaster.setFromCamera(mouse, camera);
+            const targets = grialPointsRef ? [pointsRef, grialPointsRef] : [pointsRef];
+            const intersects = raycaster.intersectObjects(targets);
+
+            if (intersects.length > 0) {
+                const hit = intersects[0];
+                const srcIdx = hit.object.userData.indexMap[hit.index];
+                const tc = catalog.targets[srcIdx];
+
+                document.getElementById('tt-name').textContent = catalog.names[srcIdx] || '—';
+                document.getElementById('tt-teff').textContent = `Estrella: ${Math.round(catalog.temps[srcIdx])} K`;
+                document.getElementById('tt-rade').textContent = `Radio: ${(catalog.radii[srcIdx] || 0).toFixed(2)} R⊕`;
+                
+                const grialText = document.getElementById('tt-grial');
+                grialText.textContent = tc === 2 ? '★ TIERRA 2.0 (GRIAL)' : tc === 1 ? 'Mundo Exótico' : tc === 0 ? 'Mundo Inhóspito' : 'Desconocido';
+                grialText.style.color = tc === 2 ? 'var(--gold)' : 'rgba(255,255,255,0.4)';
+
+                tooltip.style.display = 'block'; document.body.style.cursor = 'pointer';
+            } else {
+                tooltip.style.display = 'none'; document.body.style.cursor = 'crosshair';
+            }
+        }
+
+        // Bucle de Renderizado
+        function animate() {
+            requestAnimationFrame(animate);
+            if (autoRotate) { autoRotateY += 0.00025; scene.rotation.y = autoRotateY; }
+            renderHover(); controls.update(); renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+        
+        loadCatalog(); animate();
+    </script>
+</body>
+</html>
