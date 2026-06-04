@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
-from backend.src.visualization.config_plots import configurar_estilo, cargar_gold, guardar_figura
+from config_plots import configurar_estilo, cargar_gold, guardar_figura
 
 def generar_perfiles_clases():
     print("Cargando dataset pre-escalado con etiquetas de clase...")

@@ -1,8 +1,6 @@
-# src/visualization/plot_habitabilidad_temperatura.py
-
 import matplotlib.pyplot as plt
 import seaborn as sns
-from backend.src.visualization.config_plots import configurar_estilo, cargar_silver, guardar_figura
+from config_plots import configurar_estilo, cargar_silver, guardar_figura
 
 def generar_violin_habitabilidad():
     print("Cargando datos para análisis de habitabilidad...")
