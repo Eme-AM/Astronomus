@@ -6,10 +6,10 @@ import pandas as pd
 # ===============================
 # RUTAS CANÓNICAS DEL PROYECTO
 # ===============================
-DIR_ARCHIVE = Path("data/archive")
-DIR_SILVER  = Path("data/silver")
-DIR_GOLD    = Path("data/gold")
-DIR_FIGURAS = Path("reports/figures")
+DIR_ARCHIVE = Path("backend/data/archive")
+DIR_SILVER  = Path("backend/data/silver")
+DIR_GOLD    = Path("backend/data/gold")
+DIR_FIGURAS = Path("backend/reports/figures")
 
 # ==============================
 # ESTILO ÚNICO DE PUBLICACIÓN

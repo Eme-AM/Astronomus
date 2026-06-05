@@ -1,5 +1,3 @@
-# src/visualization/plot_auditoria_nulos.py
-
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -7,8 +5,8 @@ import seaborn as sns
 from matplotlib.patches import Patch
 
 # Rutas de datos
-DIR_ARCHIVE = "data/archive"
-DIR_FIGURAS = "reports/figures"
+DIR_ARCHIVE = "backend/data/archive"
+DIR_FIGURAS = "backend/reports/figures"
 os.makedirs(DIR_FIGURAS, exist_ok=True)
 
 sns.set_theme(style="whitegrid", context="paper", font_scale=1.2)

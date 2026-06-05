@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from backend.src.visualization.config_plots import configurar_estilo, cargar_silver, guardar_figura
+from config_plots import configurar_estilo, cargar_silver, guardar_figura
 
 def generar_heatmap():
     print("Cargando Capa Plata para análisis de correlación...")
