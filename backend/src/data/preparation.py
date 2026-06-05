@@ -17,8 +17,8 @@ logging.basicConfig(
 # ==========================================
 # CONFIGURACIÓN GLOBALES Y CONSTANTES
 # ==========================================
-RUTA_SILVER = "data/silver/data_lake_consolidado.csv"
-RUTA_GOLD_DIR = "data/gold"
+RUTA_SILVER = "backend/data/silver/data_lake_consolidado.csv"
+RUTA_GOLD_DIR = "backend/data/gold"
 ARCHIVO_PREPARADO = f"{RUTA_GOLD_DIR}/dataset_preparado_ml.csv"
 
 # Parámetros Científicos de Control

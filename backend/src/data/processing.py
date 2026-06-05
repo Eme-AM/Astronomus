@@ -27,8 +27,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'
 from src.core.physics import calc_stefan_boltzmann_temp, calc_stefan_boltzmann_insol, calc_densidad_planetaria
 
 # Constantes de Rutas y MICE
-RUTA_RAW = "data/raw"
-RUTA_SILVER_DIR = "data/silver"
+RUTA_RAW = "backend/data/raw"
+RUTA_SILVER_DIR = "backend/data/silver"
 ARCHIVO_SALIDA = f"{RUTA_SILVER_DIR}/data_lake_consolidado.csv"
 
 MICE_ITERACIONES = 10
