@@ -13,6 +13,8 @@ backend/data/gold/*
 backend/artifacts/*
 !backend/artifacts/.gitkeep
 
+artifacts/*
+
 # Python
 __pycache__/
 *.pyc
