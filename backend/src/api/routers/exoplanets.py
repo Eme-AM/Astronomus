@@ -20,6 +20,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent.parent.parent
 
 SILVER_PATH = BACKEND_DIR / "data" / "silver" / "data_lake_consolidado.csv"
 GOLD_PATH = BACKEND_DIR / "data" / "gold" / "dataset_preparado_ml.csv"
+RANKING_PATH = BACKEND_DIR / "artifacts" / "models" / "ranking_anomalias.csv"
 
 # Escala de la bóveda celeste en unidades de Three.js
 SPHERE_RADIUS = 100.0   
@@ -51,25 +52,29 @@ def get_exoplanets() -> JSONResponse:
     objetos JSON, enviamos arrays paralelos (Float32Array) que el motor 
     Three.js puede inyectar directamente en la GPU sin iteraciones costosas.
     """
-    # 1. Validación de Capa Plata (Datos Crudos Limpios)
-    if not SILVER_PATH.exists():
-        raise HTTPException(
-            status_code=503,
-            detail=f"Capa Plata no encontrada en '{SILVER_PATH}'. Ejecutá processing.py primero."
-        )
-
-    silver = pd.read_csv(SILVER_PATH, low_memory=False)
-    silver = silver.dropna(subset=["ra", "dec"]).reset_index(drop=True)
-    logger.info("Silver Layer cargada: %d planetas válidos.", len(silver))
-
-    # 2. Enriquecimiento con Capa Oro (Etiquetas de Machine Learning)
-    if GOLD_PATH.exists():
-        gold = pd.read_csv(GOLD_PATH, usecols=["pl_name", "target_class"])
-        silver = silver.merge(gold, on="pl_name", how="left")
-        logger.info("Etiquetas de ML (Capa Oro) inyectadas exitosamente.")
+    # 1. CARGA INTELIGENTE (Priorizamos el modelo de Machine Learning)
+    if RANKING_PATH.exists():
+        silver = pd.read_csv(RANKING_PATH, low_memory=False)
+        silver = silver.dropna(subset=["ra", "dec"]).reset_index(drop=True)
+        logger.info("Catálogo rankeado por IA cargado: %d planetas.", len(silver))
     else:
-        silver["target_class"] = np.nan
-        logger.warning("Capa Oro ausente. Los planetas se enviarán sin clasificación (-1).")
+        # Fallback de seguridad si aún no entrenaron el modelo
+        if not SILVER_PATH.exists():
+            raise HTTPException(
+                status_code=503,
+                detail=f"No se encontró ranking ni Capa Plata. Ejecutá processing.py primero."
+            )
+        
+        silver = pd.read_csv(SILVER_PATH, low_memory=False)
+        silver = silver.dropna(subset=["ra", "dec"]).reset_index(drop=True)
+        logger.warning("Cargando Silver Layer (Fallback). IA no disponible.")
+
+        # Enriquecimiento con Capa Oro para el fallback
+        if GOLD_PATH.exists():
+            gold = pd.read_csv(GOLD_PATH, usecols=["pl_name", "target_class"])
+            silver = silver.merge(gold, on="pl_name", how="left")
+        else:
+            silver["target_class"] = np.nan
 
     # Sanitización de clases: -1 significa "No etiquetado / Desconocido"
     silver["target_class"] = silver["target_class"].fillna(-1).astype(int)
@@ -84,21 +89,21 @@ def get_exoplanets() -> JSONResponse:
     # 4. Construcción del Payload Columnar
     payload = {
         "meta": {
-            "total": len(silver),
-            "labeled": int((silver["target_class"] >= 0).sum()),
-            "griales": int((silver["target_class"] == 2).sum()),
+            "total":          len(silver),
+            "labeled":        int((silver["target_class"] >= 0).sum()),
+            "griales":        int((silver["target_class"] == 2).sum()),
+            "ia_candidates":  int((silver["target_class"] == 3).sum()), # <-- NUEVO
             "schema_version": "1.0",
         },
-        # Aplanamos la matriz 3D a un vector simple: [x0,y0,z0, x1,y1,z1...]
-        "positions": np.column_stack([x, y, z]).flatten().round(4).tolist(),
-        "temperatures": silver["st_teff"].tolist(),
-        "radii": silver["pl_rade"].tolist(),
+        "positions":      np.column_stack([x, y, z]).flatten().round(4).tolist(),
+        "temperatures":   silver["st_teff"].tolist(),
+        "radii":          silver["pl_rade"].tolist(),
         "target_classes": silver["target_class"].tolist(),
         
-        # ESPACIO RESERVADO: Aquí inyectaremos los resultados del Autoencoder
-        "anomaly_scores": [None] * len(silver),   
+        # Enviamos el IHP en lugar del anomaly_score crudo
+        "ihp":            silver["ihp"].tolist() if "ihp" in silver.columns else [0] * len(silver),
         
-        "names": silver["pl_name"].astype(str).tolist(),
+        "names":          silver["pl_name"].astype(str).tolist(),
     }
 
     return JSONResponse(payload)

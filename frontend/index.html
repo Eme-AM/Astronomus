@@ -62,6 +62,7 @@
         .hud-row { display: flex; gap: 14px; align-items: baseline; font-size: 14px; letter-spacing: 2px; color: rgba(255,255,255,0.8); margin-bottom: 5px; }
         .hud-row .val { color: rgba(255,255,255,0.8); font-size: 14px; }
         .hud-row .grial { color: var(--gold); font-size: 14px; }
+        .hud-row .ia { color: var(--cyan); font-size: 14px; text-shadow: 0 0 8px var(--cyan); }
         .hud-divider { width: 120px; height: 1px; background: var(--border); margin: 10px 0; }
 
         /* --- LEYENDA TÉRMICA --- */
@@ -72,6 +73,7 @@
         .legend-labels { display: flex; justify-content: space-between; font-size: 16px; letter-spacing: 1px; color: rgba(255,255,255,0.8); margin-top: 4px; }
         .legend-grial { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 16px; letter-spacing: 2px; color: rgba(255,255,255,0.8); }
         .grial-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+        .ia-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
 
         #controls-hint { bottom: 24px; right: 24px; font-size: 13px; letter-spacing: 2px; color: rgba(255,255,255,0.8); text-align: right; line-height: 2.2; transition-delay: 0.7s; }
 
@@ -107,14 +109,16 @@
         <div class="hud-row">TOTAL <span class="val" id="h-total">—</span></div>
         <div class="hud-row">ETIQUETADOS <span class="val" id="h-labeled">—</span></div>
         <div class="hud-divider"></div>
-        <div class="hud-row">★ TIERRA 2.0 <span class="grial" id="h-griales">—</span></div>
+        <div class="hud-row">★ GRIALES PHL <span class="grial" id="h-griales">—</span></div>
+        <div class="hud-row">♦ HALLAZGOS IA <span class="ia" id="h-ia-candidates">—</span></div>
     </div>
 
     <div id="legend">
         <div class="legend-title">TEMPERATURA ESTELAR</div>
         <div class="legend-bar"></div>
         <div class="legend-labels"><span>2500K</span><span>M · K · G · F · A</span><span>10000K</span></div>
-        <div class="legend-grial"><div class="grial-dot"></div><span>GRIAL — TIERRA 2.0 (ESI ≥ 0.80)</span></div>
+        <div class="legend-grial"><div class="grial-dot"></div><span>GRIAL — TIERRA 2.0 (Etiquetado)</span></div>
+        <div class="legend-grial"><div class="ia-dot"></div><span>CANDIDATO IA — (IHP Alto)</span></div>
     </div>
 
     <div id="controls-hint">ARRASTRAR · ROTAR<br>SCROLL · ZOOM<br>HOVER · IDENTIFICAR</div>
@@ -123,6 +127,7 @@
         <div class="t-name" id="tt-name"></div>
         <div id="tt-teff"></div>
         <div id="tt-rade"></div>
+        <div id="tt-ihp" style="color: var(--cyan); margin-top: 2px;"></div>
         <div id="tt-grial" style="margin-top: 4px; letter-spacing: 2px; font-size: 9px;"></div>
     </div>
 
@@ -139,7 +144,6 @@
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        // Conexión dinámica (Localhost si se abre directo, o ruta relativa si sirve FastAPI)
         const API_URL = window.location.protocol === 'file:' ? 'http://localhost:8000/api/exoplanets' : '/api/exoplanets';
 
         // ==========================================
@@ -154,13 +158,11 @@
         const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 2000);
         camera.position.set(0, 40, 220);
 
-        // Esfera de referencia tenue
         scene.add(new THREE.Mesh(
             new THREE.SphereGeometry(108, 36, 18),
             new THREE.MeshBasicMaterial({ color: 0x0a0a14, wireframe: true, transparent: true, opacity: 0.07 })
         ));
 
-        // Controles de cámara
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true; controls.dampingFactor = 0.05;
         controls.minDistance = 15; controls.maxDistance = 700;
@@ -168,16 +170,16 @@
         controls.addEventListener('start', () => { autoRotate = false; });
 
         // ==========================================
-        // FÍSICA A COLOR (Leyes de Radiación)
+        // FÍSICA A COLOR
         // ==========================================
         function tempToRGB(teff) {
             const t = Math.max(2500, Math.min(10000, teff || 5778));
             let r, g, b;
-            if (t < 3700) { r=1; g=0.3+(t-2500)/4167; b=0; } // Enanas Rojas (M)
-            else if (t < 5200) { r=1; g=0.6+(t-3700)/7500; b=0.05; } // Naranjas (K)
-            else if (t < 6000) { r=1; g=0.9+(t-5200)/8000; b=0.4+(t-5200)/2000; } // Amarillas (G - Sol)
-            else if (t < 7500) { r=1; g=1; b=0.65+(t-6000)/4286; } // Blancas (F)
-            else { r=0.75+(10000-t)/10000; g=0.88; b=1; } // Azules (A)
+            if (t < 3700) { r=1; g=0.3+(t-2500)/4167; b=0; }
+            else if (t < 5200) { r=1; g=0.6+(t-3700)/7500; b=0.05; }
+            else if (t < 6000) { r=1; g=0.9+(t-5200)/8000; b=0.4+(t-5200)/2000; }
+            else if (t < 7500) { r=1; g=1; b=0.65+(t-6000)/4286; }
+            else { r=0.75+(10000-t)/10000; g=0.88; b=1; }
             return [Math.min(1,r), Math.min(1,g), Math.min(1,b)];
         }
 
@@ -186,8 +188,8 @@
         // ==========================================
         const raycaster = new THREE.Raycaster(); raycaster.params.Points.threshold = 1.2;
         const mouse = new THREE.Vector2();
-        let pointsRef = null, grialPointsRef = null;
-        let catalog = { names: [], temps: [], radii: [], targets: [] };
+        let pointsRef = null, grialPointsRef = null, iaPointsRef = null;
+        let catalog = { names: [], temps: [], radii: [], targets: [], ihps: [] };
 
         async function loadCatalog() {
             const setStatus = (msg, pct) => { document.getElementById('status-msg').textContent = msg; document.getElementById('prog').style.width = pct + '%'; };
@@ -199,22 +201,32 @@
                 setStatus('Descargando Data Lake Espacial...', 40);
                 const data = await res.json();
 
-                catalog = { names: data.names, temps: data.temperatures, radii: data.radii, targets: data.target_classes };
+                // Incorporamos el IHP al catálogo local
+                catalog = { names: data.names, temps: data.temperatures, radii: data.radii, targets: data.target_classes, ihps: data.ihp };
                 
                 setStatus(`Procesando ${data.meta.total} cuerpos celestes...`, 70);
-                await new Promise(r => setTimeout(r, 50)); // Respirar UI
+                await new Promise(r => setTimeout(r, 50)); 
 
-                // Separación eficiente en memoria
-                const normIdx = [], grialIdx = [];
-                data.target_classes.forEach((tc, i) => tc === 2 ? grialIdx.push(i) : normIdx.push(i));
+                // ── Separar índices: normales vs Griales vs IA ──
+                const normIdx = [], grialIdx = [], iaIdx = [];
+                data.target_classes.forEach((tc, i) => {
+                    if (tc === 2) grialIdx.push(i);
+                    else if (tc === 3) iaIdx.push(i); // Nube IA
+                    else normIdx.push(i);
+                });
+
+                const jitter = () => (Math.random() - 0.5) * 3.5;
 
                 // 1. NUBE DE PLANETAS ESTÁNDAR
                 const normPos = new Float32Array(normIdx.length * 3);
                 const normCol = new Float32Array(normIdx.length * 3);
                 normIdx.forEach((src, dst) => {
-                    normPos[dst*3] = data.positions[src*3]; normPos[dst*3+1] = data.positions[src*3+1]; normPos[dst*3+2] = data.positions[src*3+2];
+                    normPos[dst*3] = data.positions[src*3] + jitter();
+                    normPos[dst*3+1] = data.positions[src*3+1] + jitter();
+                    normPos[dst*3+2] = data.positions[src*3+2] + jitter();
                     const [r, g, b] = tempToRGB(data.temperatures[src]);
-                    normCol[dst*3] = r; normCol[dst*3+1] = g; normCol[dst*3+2] = b;
+                    normCol[dst*3] = r;
+                    normCol[dst*3+1] = g; normCol[dst*3+2] = b;
                 });
 
                 const normGeo = new THREE.BufferGeometry();
@@ -224,7 +236,7 @@
                 pointsRef.userData.indexMap = normIdx;
                 scene.add(pointsRef);
 
-                // 2. NUBE DE GRIALES (Tierras 2.0)
+                // 2. NUBE DE GRIALES (Tierras 2.0 de Arecibo)
                 if (grialIdx.length > 0) {
                     const gPos = new Float32Array(grialIdx.length * 3);
                     grialIdx.forEach((src, dst) => { gPos[dst*3] = data.positions[src*3]; gPos[dst*3+1] = data.positions[src*3+1]; gPos[dst*3+2] = data.positions[src*3+2]; });
@@ -233,13 +245,26 @@
                     grialPointsRef = new THREE.Points(gGeo, new THREE.PointsMaterial({ color: 0xf1c40f, size: 5.5, sizeAttenuation: true }));
                     grialPointsRef.userData.indexMap = grialIdx;
                     scene.add(grialPointsRef);
-                    scene.add(new THREE.Points(gGeo, new THREE.PointsMaterial({ color: 0xf39c12, size: 11.0, sizeAttenuation: true, transparent: true, opacity: 0.18 }))); // Halo
+                    scene.add(new THREE.Points(gGeo, new THREE.PointsMaterial({ color: 0xf39c12, size: 11.0, sizeAttenuation: true, transparent: true, opacity: 0.18 }))); 
+                }
+
+                // 3. NUBE DE DESCUBRIMIENTOS IA (Candidatos IHP)
+                if (iaIdx.length > 0) {
+                    const iaPos = new Float32Array(iaIdx.length * 3);
+                    iaIdx.forEach((src, dst) => { iaPos[dst*3] = data.positions[src*3]; iaPos[dst*3+1] = data.positions[src*3+1]; iaPos[dst*3+2] = data.positions[src*3+2]; });
+                    const iaGeo = new THREE.BufferGeometry(); iaGeo.setAttribute('position', new THREE.BufferAttribute(iaPos, 3));
+                    
+                    iaPointsRef = new THREE.Points(iaGeo, new THREE.PointsMaterial({ color: 0x00d4ff, size: 4.5, sizeAttenuation: true }));
+                    iaPointsRef.userData.indexMap = iaIdx;
+                    scene.add(iaPointsRef);
+                    scene.add(new THREE.Points(iaGeo, new THREE.PointsMaterial({ color: 0x00d4ff, size: 9.0, sizeAttenuation: true, transparent: true, opacity: 0.15 }))); 
                 }
 
                 // Actualizar Textos HUD
                 document.getElementById('h-total').textContent = data.meta.total.toLocaleString('es-AR') + ' EXOPLANETAS';
                 document.getElementById('h-labeled').textContent = data.meta.labeled.toLocaleString('es-AR');
-                document.getElementById('h-griales').textContent = data.meta.griales + ' CANDIDATOS';
+                document.getElementById('h-griales').textContent = data.meta.griales + ' PLANETAS';
+                document.getElementById('h-ia-candidates').textContent = (data.meta.ia_candidates || 0) + ' DETECTADOS'; // Inyectamos conteo IA
 
                 setStatus('Catálogo inicializado', 100);
                 setTimeout(() => { 
@@ -262,9 +287,15 @@
         });
 
         function renderHover() {
-            if (!pointsRef) return;
+            // Evaluamos intersecciones sobre las tres nubes estelares
+            const targets = [];
+            if (pointsRef) targets.push(pointsRef);
+            if (grialPointsRef) targets.push(grialPointsRef);
+            if (iaPointsRef) targets.push(iaPointsRef);
+
+            if (targets.length === 0) return;
+            
             raycaster.setFromCamera(mouse, camera);
-            const targets = grialPointsRef ? [pointsRef, grialPointsRef] : [pointsRef];
             const intersects = raycaster.intersectObjects(targets);
 
             if (intersects.length > 0) {
@@ -276,9 +307,14 @@
                 document.getElementById('tt-teff').textContent = `Estrella: ${Math.round(catalog.temps[srcIdx])} K`;
                 document.getElementById('tt-rade').textContent = `Radio: ${(catalog.radii[srcIdx] || 0).toFixed(2)} R⊕`;
                 
+                // Mostrar el IHP (Si es 0, no lo mostramos para los mundos inhóspitos confirmados)
+                const ihpVal = catalog.ihps[srcIdx] || 0;
+                document.getElementById('tt-ihp').textContent = ihpVal > 0 ? `IHP: ${ihpVal.toFixed(2)}%` : '';
+                
+                // Color y etiqueta del Tooltip
                 const grialText = document.getElementById('tt-grial');
-                grialText.textContent = tc === 2 ? '★ TIERRA 2.0 (GRIAL)' : tc === 1 ? 'Mundo Exótico' : tc === 0 ? 'Mundo Inhóspito' : 'Desconocido';
-                grialText.style.color = tc === 2 ? 'var(--gold)' : 'rgba(255,255,255,0.4)';
+                grialText.textContent = tc === 3 ? '♦ DESCUBRIMIENTO IA' : tc === 2 ? '★ TIERRA 2.0 (GRIAL)' : tc === 1 ? 'Mundo Exótico' : tc === 0 ? 'Mundo Inhóspito' : 'Desconocido';
+                grialText.style.color = tc === 3 ? 'var(--cyan)' : tc === 2 ? 'var(--gold)' : 'rgba(255,255,255,0.4)';
 
                 tooltip.style.display = 'block'; document.body.style.cursor = 'pointer';
             } else {
@@ -286,7 +322,6 @@
             }
         }
 
-        // Bucle de Renderizado
         function animate() {
             requestAnimationFrame(animate);
             if (autoRotate) { autoRotateY += 0.00025; scene.rotation.y = autoRotateY; }
