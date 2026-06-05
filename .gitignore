@@ -1,7 +1,7 @@
 # Datos y Modelos
 backend/data/archive
 
-backend/data/raw/*
+#backend/data/raw/*
 !backend/data/raw/.gitkeep
 
 backend/data/silver/*
