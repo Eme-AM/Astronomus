@@ -37,7 +37,7 @@ def ejecutar_pipeline_completo():
         ejecutar_preparacion_target()
         
         logger.info("=== PIPELINE FINALIZADO CON ÉXITO ===")
-        logger.info("Los tensores están listos en data/gold/ para entrenar la Red Neuronal.")
+        logger.info("Los tensores están listos en backend/data/gold/ para entrenar la Red Neuronal.")
         
     except Exception as e:
         logger.error(f"El pipeline falló de manera crítica: {e}")

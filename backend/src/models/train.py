@@ -1,5 +1,3 @@
-# backend/src/models/train.py
-
 import os
 import sys
 import logging
@@ -10,79 +8,58 @@ from torch.utils.data import DataLoader
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import IsolationForest
-from sklearn.preprocessing import RobustScaler
-import joblib
 
-# Importamos la nueva arquitectura del Autoencoder
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 from src.models.autoencoder import AstronomusAE, ExoplanetUnsupervisedDataset
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S')
 
 DIR_GOLD = "backend/data/gold"
+DIR_SILVER = "backend/data/silver"
 DIR_ARTEFACTOS = "backend/artifacts/models"
 os.makedirs(DIR_ARTEFACTOS, exist_ok=True)
 
-# Hiperparámetros del Autoencoder
 EPOCHS = 150
 BATCH_SIZE = 64
 LEARNING_RATE = 0.001
 
-# --- FIX MLOPS: Compresión de Colas Pesadas ---
-FEATURES_LOG_TRANSFORM = ['pl_orbper', 'pl_bmasse', 'pl_insol', 'pl_dens']
-
-def _aplicar_log_transform(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Comprime features con distribución log-normal antes del RobustScaler.
-    Evita que los outliers masivos saturen el gradiente del Autoencoder.
-    """
-    df = df.copy()
-    for col in FEATURES_LOG_TRANSFORM:
-        if col in df.columns:
-            df[col] = np.log1p(df[col].clip(lower=0))
-    return df
-
 def ejecutar_pipeline_hibrido():
-    logging.info("Iniciando Pipeline Híbrido v2 (Con Log-Transform)...")
+    logging.info("Iniciando Pipeline Híbrido (Weighted AE + Isolation Forest)...")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     try:
-        df_completo = pd.read_csv(f"{DIR_GOLD}/dataset_preparado_ml.csv", low_memory=False)
-    except FileNotFoundError:
-        logging.error("No se encontró el dataset preparado en la Capa Oro.")
+        df_scaled = pd.read_csv(f"{DIR_GOLD}/X_scaled.csv")
+        y_df = pd.read_csv(f"{DIR_GOLD}/y.csv")
+        df_completo_plata = pd.read_csv(f"{DIR_SILVER}/data_lake_consolidado.csv", low_memory=False)
+        df_completo_oro = pd.read_csv(f"{DIR_GOLD}/dataset_preparado_ml.csv", low_memory=False)
+    except FileNotFoundError as e:
+        logging.error(f"Falta archivo de datos: {e}")
         return
 
-    columnas_excluidas = ['pl_name', 'target_class']
-    features = [c for c in df_completo.columns if c not in columnas_excluidas]
+    # Separar IDs para alineación segura
+    pl_names = df_scaled['pl_name']
+    X_scaled_df = df_scaled.drop(columns=['pl_name'])
+    features = X_scaled_df.columns.tolist()
     
-    mask_griales = df_completo['target_class'] == 2
-    df_griales = df_completo[mask_griales].copy()
-    df_normales = df_completo[~mask_griales].copy()
-    
-    # APLICACIÓN DEL FIX LOGARÍTMICO
-    X_train_raw = _aplicar_log_transform(df_normales[features])
-    X_todo_raw = _aplicar_log_transform(df_completo[features])
-    
-    logging.info(f"Universo de entrenamiento (Normalidad): {len(X_train_raw)} planetas.")
-    logging.info(f"Griales ocultos para evaluación LOOCV: {len(df_griales)} planetas.")
+    # Estrategia Conservadora: Entrenar SOLO con planetas etiquetados como no-habitables
+    mask_normales = (y_df['target_class'] == 0) | (y_df['target_class'] == 1)
+    X_train_normales = X_scaled_df[mask_normales]
 
-    logging.info("Aplicando RobustScaler para normalizar magnitudes físicas...")
-    scaler = RobustScaler()
-    X_train_scaled = scaler.fit_transform(X_train_raw)
-    X_todo_scaled = scaler.transform(X_todo_raw)
-    joblib.dump(scaler, f"{DIR_ARTEFACTOS}/robust_scaler.pkl")
+    logging.info(f"Universo de entrenamiento (Normalidad etiquetada): {len(X_train_normales)} planetas.")
 
     # ==========================================
-    # FASE 1: ENTRENAMIENTO DEL AUTOENCODER
+    # FASE 1: ENTRENAMIENTO AUTOENCODER
     # ==========================================
-    logging.info("--- Iniciando Fase 1: Entrenamiento Autoencoder ---")
-    dataset_ae = ExoplanetUnsupervisedDataset(pd.DataFrame(X_train_scaled, columns=features))
-    
+    logging.info("--- Fase 1: Entrenamiento Autoencoder ---")
+    dataset_ae = ExoplanetUnsupervisedDataset(X_train_normales)
     dataloader = DataLoader(dataset_ae, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
     
     modelo_ae = AstronomusAE(input_dim=len(features)).to(device)
     criterio = nn.MSELoss()
     optimizador = optim.AdamW(modelo_ae.parameters(), lr=LEARNING_RATE, weight_decay=1e-4)
+    
+    # Scheduler y clipping para estabilidad
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizador, T_max=EPOCHS, eta_min=1e-5)
     
     modelo_ae.train()
     for epoch in range(EPOCHS):
@@ -90,112 +67,129 @@ def ejecutar_pipeline_hibrido():
         for batch_X, _ in dataloader:
             batch_X = batch_X.to(device)
             optimizador.zero_grad()
-            
-            reconstruccion = modelo_ae(batch_X)
-            loss = criterio(reconstruccion, batch_X)
-            
+            loss = criterio(modelo_ae(batch_X), batch_X)
             loss.backward()
+            nn.utils.clip_grad_norm_(modelo_ae.parameters(), max_norm=1.0)
             optimizador.step()
             loss_acumulada += loss.item()
             
+        scheduler.step()
+        
         if (epoch + 1) % 25 == 0:
-            logging.info(f"  Época [{epoch+1}/{EPOCHS}] - MSE: {loss_acumulada/len(dataloader):.4f}")
+            logging.info("  Época [%d/%d] - MSE: %.4f | LR: %.6f", 
+                         epoch+1, EPOCHS, loss_acumulada/len(dataloader), scheduler.get_last_lr()[0])
 
     torch.save(modelo_ae.state_dict(), f"{DIR_ARTEFACTOS}/astronomus_ae.pth")
     
     # ==========================================
-    # FASE 2: ENTRENAMIENTO ISOLATION FOREST
+    # FASE 2: ISOLATION FOREST
     # ==========================================
-    logging.info("--- Iniciando Fase 2: Isolation Forest ---")
+    logging.info("--- Fase 2: Isolation Forest ---")
     modelo_if = IsolationForest(n_estimators=200, contamination='auto', random_state=42)
-    modelo_if.fit(X_train_scaled)
-    joblib.dump(modelo_if, f"{DIR_ARTEFACTOS}/astronomus_if.pkl")
+    modelo_if.fit(X_train_normales.values)
 
     # ==========================================
     # FASE 3: EVALUACIÓN Y RANKEADO
     # ==========================================
-    logging.info("--- Fase 3: Evaluación de Anomalías en todo el Data Lake ---")
+    logging.info("--- Fase 3: Evaluación de Anomalías Globales ---")
+    X_todo_tensor = torch.tensor(X_scaled_df.values, dtype=torch.float32).to(device)
     
-    X_todo_tensor = torch.tensor(X_todo_scaled, dtype=torch.float32).to(device)
+    # Aplicar MSE ponderado por astrofísica
+    mse_scores = modelo_ae.get_reconstruction_error(X_todo_tensor, feature_names=features).cpu().numpy()
+    if_scores = -modelo_if.score_samples(X_scaled_df.values)
     
-    mse_scores = modelo_ae.get_reconstruction_error(X_todo_tensor).cpu().numpy()
-    if_scores = -modelo_if.score_samples(X_todo_scaled)
+    # Alineación segura mediante pl_name
+    df_scores = pd.DataFrame({
+        'pl_name': pl_names.values,
+        'ae_score': mse_scores,
+        'if_score': if_scores,
+    })
     
-    df_completo['ae_anomaly_score'] = mse_scores
-    df_completo['if_anomaly_score'] = if_scores
+    df_ranking = df_completo_oro.merge(df_scores, on='pl_name', how='left')
     
-    df_completo['ae_norm'] = (df_completo['ae_anomaly_score'] - df_completo['ae_anomaly_score'].min()) / (df_completo['ae_anomaly_score'].max() - df_completo['ae_anomaly_score'].min())
-    df_completo['if_norm'] = (df_completo['if_anomaly_score'] - df_completo['if_anomaly_score'].min()) / (df_completo['if_anomaly_score'].max() - df_completo['if_anomaly_score'].min())
+    ae_norm = (df_ranking['ae_score'] - df_ranking['ae_score'].min()) / (df_ranking['ae_score'].max() - df_ranking['ae_score'].min())
+    if_norm = (df_ranking['if_score'] - df_ranking['if_score'].min()) / (df_ranking['if_score'].max() - df_ranking['if_score'].min())
     
-    df_completo['hybrid_score'] = (0.7 * df_completo['ae_norm']) + (0.3 * df_completo['if_norm'])
-    
-    ranking = df_completo.sort_values(by='hybrid_score', ascending=False).reset_index(drop=True)
-    
-    posiciones_griales = ranking[ranking['target_class'] == 2].index.tolist()
-    posiciones_humanas = [p + 1 for p in posiciones_griales]
-    
-    logging.info(f"Resultados de la Búsqueda (Total: {len(ranking)} planetas):")
-    logging.info(f"Posiciones de los 7 Griales: {posiciones_humanas}")
-    
-    top_5_percent = int(len(ranking) * 0.05)
-    aciertos_top5 = sum(1 for p in posiciones_humanas if p <= top_5_percent)
-    logging.info(f"Precisión del Ensamble: {aciertos_top5}/7 Griales en el Top 5% del universo.")
-    
+    df_ranking['hybrid_score'] = (0.7 * ae_norm) + (0.3 * if_norm)
+
     # ==========================================
-    # FASE 4: CREACIÓN DEL IHP Y PSEUDO-ETIQUETADO
+    # FASE 4: ÍNDICE DE HABITABILIDAD PLANETARIA (Modelo Heller)
     # ==========================================
-    logging.info("--- Fase 4: Cálculo del IHP (Filtro Astrofísico) ---")
+    logging.info("--- Fase 4: Cálculo del IHP (Rareza IA + Súper-Habitabilidad Heller) ---")
     
-    df_completo['indice_rareza'] = (df_completo['hybrid_score'] * 100).round(2)
+    # 1. Conservamos la métrica de Excepcionalidad de la IA
+    df_ranking['excepcionalidad_ia'] = df_ranking['hybrid_score']
     
-    # FILTRO FÍSICO (Bounding Box de Habitabilidad)
-    # Extermina a los gigantes gaseosos (KELT-9 b) y mundos de lava
+    # 2. Óptimos Súper-Habitables (René Heller & John Armstrong)
+    IDEAL_RADE = 1.25   # Mayor retención atmosférica y tectónica activa
+    IDEAL_TEFF = 4200.0 # Estrella Enana K (Larga vida, baja radiación estelar)
+    IDEAL_EQT  = 265.0  # Clima global ligeramente más cálido que la Tierra
+    
+    # 3. Cálculo de Similitud de Heller (Fórmula tipo ESI Euclidiana ponderada)
+    eps = 1e-8 # Previene divisiones por cero
+    
+    # Utilizamos pesos empíricos (Radio y Temperatura Eq son críticos)
+    sim_rade = (1 - abs((df_ranking['pl_rade'] - IDEAL_RADE) / (df_ranking['pl_rade'] + IDEAL_RADE + eps))) ** 4.0
+    sim_teff = (1 - abs((df_ranking['st_teff'] - IDEAL_TEFF) / (df_ranking['st_teff'] + IDEAL_TEFF + eps))) ** 2.0
+    sim_eqt  = (1 - abs((df_ranking['pl_eqt']  - IDEAL_EQT)  / (df_ranking['pl_eqt']  + IDEAL_EQT  + eps))) ** 4.0
+    
+    df_ranking['similitud_heller'] = (sim_rade * sim_teff * sim_eqt) ** (1/3)
+    
+    # 4. El Bounding Box Físico Duro (La guillotina de los gigantes gaseosos)
     mask_habitable = (
-        (df_completo['pl_rade'] <= 2.5) & 
-        (df_completo['pl_eqt'] >= 150) & 
-        (df_completo['pl_eqt'] <= 400)
+        (df_ranking['pl_rade'] <= 2.5) & 
+        (df_ranking['pl_eqt'] >= 150) & 
+        (df_ranking['pl_eqt'] <= 500)
     )
     
-    # Si es habitable, IHP = Rareza. Si no, IHP = 0.
-    df_completo['ihp'] = np.where(mask_habitable, df_completo['indice_rareza'], 0.0)
-    ranking = df_completo.sort_values(by='ihp', ascending=False).reset_index(drop=True)
+    # 5. EL NUEVO IHP: Confluencia de Excepcionalidad Estadística y Perfección Biológica
+    # Un 50% de peso a que la IA lo aísle de la monotonía galáctica
+    # Un 50% de peso a que la física se acerque al paraíso de Heller
     
-    # Calculamos el umbral SOLO con los Griales que pasaron el filtro
-    umbral_grial = ranking[ranking['target_class'] == 2]['ihp'].min()
-    logging.info(f"Umbral de Habitabilidad IHP fijado en: {umbral_grial:.2f}%")
+    # 1. Conservamos los sub-scores desglosados
+    df_ranking['score_ia'] = (df_ranking['excepcionalidad_ia'] * 100).round(2)
+    df_ranking['score_heller'] = (df_ranking['similitud_heller'] * 100).round(2)
     
-    # Pseudo-etiquetamos huérfanos que superen el umbral
-    mask_candidatos_ia = (ranking['target_class'] == -1) & (ranking['ihp'] >= umbral_grial)
-    nuevos_descubrimientos = mask_candidatos_ia.sum()
+    # 2. IHP ponderado (Mantenemos la lógica de 50/50, pero ahora es auditable)
+    df_ranking['ihp'] = np.where(mask_habitable,(df_ranking['score_ia'] * 0.5) + (df_ranking['score_heller'] * 0.5), 0.0).round(2)
+    #ihp_calculado = (df_ranking['excepcionalidad_ia'] * 0.5) + (df_ranking['similitud_heller'] * 0.5)
     
-    ranking.loc[mask_candidatos_ia, 'target_class'] = 3
-    logging.info(f"¡El modelo filtró la radiación y pseudo-etiquetó {nuevos_descubrimientos} Candidatos IA!")
-    
-    ranking.to_csv(f"{DIR_ARTEFACTOS}/ranking_anomalias.csv", index=False)
-    logging.info("Pipeline completado exitosamente. Ranking exportado con IHP real.")
+    # Escalamos a porcentaje y fulminamos a los no habitables
+    #df_ranking['ihp'] = np.where(mask_habitable, ihp_calculado * 100, 0.0).round(2)
+    df_ranking = df_ranking.sort_values(by='ihp', ascending=False).reset_index(drop=True)
 
-    # --- DIAGNÓSTICO PROFUNDO ---
-    logging.info("\n" + "="*50)
-    logging.info("PERFIL FÍSICO DE LOS 7 GRIALES (Auditoría de Reconstrucción)")
-    logging.info("="*50)
+    # 6. Umbral Estadístico y Pseudo-etiquetado
+    umbral_ia = df_ranking[df_ranking['ihp'] > 0]['ihp'].quantile(0.96)
+    mask_candidatos = (df_ranking['target_class'] == -1) & (df_ranking['ihp'] >= umbral_ia)
+    nuevos_hallazgos = mask_candidatos.sum()
+    df_ranking.loc[mask_candidatos, 'target_class'] = 3
     
-    griales_ranking = ranking[ranking['target_class'] == 2][
-        ['pl_name', 'hybrid_score', 'ae_norm', 'if_norm'] + features
-    ].copy()
-    griales_ranking['posicion'] = posiciones_humanas
+    logging.info(f"Umbral IA fijado en IHP: {umbral_ia:.2f}%. Hallazgos IA etiquetados: {nuevos_hallazgos}")
     
-    # Ordenamos columnas para visualización clara en consola
-    columnas_print = ['pl_name', 'posicion', 'hybrid_score', 'ae_norm', 'if_norm', 'st_teff', 'pl_rade', 'pl_eqt', 'pl_insol']
+    df_final = pd.merge(
+        df_ranking[['pl_name', 'target_class', 'ihp', 'score_ia', 'score_heller']],
+        df_completo_plata, 
+        on='pl_name', 
+        how='left'
+    )
     
-    # Convertimos a string tabulado
-    tabla_str = griales_ranking[columnas_print].to_string(index=False)
-    for linea in tabla_str.split('\n'):
-        logging.info(linea)
-        
-    logging.info("="*50 + "\n")
+    df_final.to_csv(f"{DIR_ARTEFACTOS}/ranking_anomalias.csv", index=False)
     
-    ranking.to_csv(f"{DIR_ARTEFACTOS}/ranking_anomalias.csv", index=False)
-    logging.info("Pipeline completado exitosamente. Ranking exportado.")
+    # ==========================================
+    # DIAGNÓSTICO FINAL
+    # ==========================================
+    cols_diagnostico = ['pl_name', 'ihp', 'pl_rade', 'pl_eqt', 'pl_insol', 'st_teff', 'st_mass']
+    cols_presentes = [c for c in cols_diagnostico if c in df_ranking.columns]
+    
+    nuevos = df_ranking[df_ranking['target_class'] == 3]
+    logging.info("\n── PERFIL DE LOS %d HALLAZGOS IA ──", len(nuevos))
+    print(nuevos[cols_presentes].sort_values('ihp', ascending=False).to_string(index=False))
+
+    griales = df_ranking[df_ranking['target_class'] == 2]
+    logging.info("\n── GRIALES CONOCIDOS (Validación) ──")
+    print(griales[cols_presentes].sort_values('ihp', ascending=False).to_string(index=False))
+    
+    logging.info("\nPipeline completado exitosamente. Ranking exportado con IHP real.")
 
 if __name__ == "__main__":
     ejecutar_pipeline_hibrido()

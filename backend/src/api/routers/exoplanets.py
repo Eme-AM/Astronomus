@@ -92,7 +92,9 @@ def get_exoplanets() -> JSONResponse:
             "total":          len(silver),
             "labeled":        int((silver["target_class"] >= 0).sum()),
             "griales":        int((silver["target_class"] == 2).sum()),
-            "ia_candidates":  int((silver["target_class"] == 3).sum()), # <-- NUEVO
+            "ia_candidates":  int((silver["target_class"] == 3).sum()), 
+            "exoticos":       int((silver["target_class"] == 1).sum()),
+            "inhospitos":     int((silver["target_class"] <= 0).sum()),  
             "schema_version": "1.0",
         },
         "positions":      np.column_stack([x, y, z]).flatten().round(4).tolist(),
@@ -100,9 +102,10 @@ def get_exoplanets() -> JSONResponse:
         "radii":          silver["pl_rade"].tolist(),
         "target_classes": silver["target_class"].tolist(),
         
-        # Enviamos el IHP en lugar del anomaly_score crudo
-        "ihp":            silver["ihp"].tolist() if "ihp" in silver.columns else [0] * len(silver),
-        
+        # Enviamos el IHP
+        "ihp":            silver["ihp"].tolist(),
+        "score_ia":       silver["score_ia"].tolist(),      
+        "score_heller":   silver["score_heller"].tolist(),  
         "names":          silver["pl_name"].astype(str).tolist(),
     }
 

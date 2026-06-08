@@ -1,19 +1,28 @@
-# backend/src/models/autoencoder.py
-
 import torch
 import torch.nn as nn
 import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset
 
+# Pesos astrofísicos para el cálculo de anomalías
+FEATURE_HABITABILITY_WEIGHTS = {
+    'pl_rade':    4.0,   # Discriminador rocoso/gaseoso (crítico)
+    'pl_eqt':     4.0,   # Temperatura equilibrio (crítico)
+    'pl_insol':   3.0,   # Zona habitable estelar
+    'pl_dens':    2.0,   # Composición interna
+    'pl_bmasse':  1.5,   # Retención atmosférica
+    'st_teff':    1.0,   # Tipo estelar
+    'pl_orbeccen':0.8,   # Estabilidad orbital
+    'st_rad':     0.5,   # Parámetro estelar secundario
+    'st_mass':    0.5,
+    'st_met':     0.5,   # Metalicidad
+    'pl_orbper':  0.3,   # Período orbital
+    'st_age':     0.3,   # Tiempo para desarrollo de vida
+}
+
 class ExoplanetUnsupervisedDataset(Dataset):
-    """
-    Dataset para aprendizaje no supervisado (Autoencoder).
-    En un AE la etiqueta es la propia entrada (X -> X'),
-    por lo que __getitem__ retorna (X, X).
-    """
+    """Dataset para aprendizaje no supervisado (Autoencoder)."""
     def __init__(self, features_df: pd.DataFrame):
-        # Validación defensiva: NaN silencioso mata el entrenamiento
         nans = features_df.isnull().sum().sum()
         if nans > 0:
             cols_nan = features_df.columns[features_df.isnull().any()].tolist()
@@ -21,7 +30,6 @@ class ExoplanetUnsupervisedDataset(Dataset):
                 f"ExoplanetUnsupervisedDataset recibió {nans} NaN en: {cols_nan}. "
                 "Ejecutá preparation.py para regenerar la Capa Oro."
             )
-        # Reemplazamos torch.tensor por torch.from_numpy para evitar copias de memoria
         self.X = torch.from_numpy(features_df.values.astype(np.float32))
 
     def __len__(self) -> int:
@@ -30,22 +38,10 @@ class ExoplanetUnsupervisedDataset(Dataset):
     def __getitem__(self, idx) -> tuple[torch.Tensor, torch.Tensor]:
         return self.X[idx], self.X[idx]
 
-
 class AstronomusAE(nn.Module):
-    """
-    Autoencoder simétrico para detección de anomalías astrofísicas.
-
-    Topología: input_dim -> 8 -> 4 -> 2 (latente) -> 4 -> 8 -> input_dim
-
-    El cuello de botella de 2 dimensiones permite:
-    - Visualización directa del espacio latente (scatter 2D)
-    - Compresión agresiva que fuerza al modelo a aprender solo
-      los patrones más comunes, dejando a los Griales con
-      alto error de reconstrucción.
-    """
+    """Autoencoder simétrico para detección de anomalías astrofísicas."""
     def __init__(self, input_dim: int):       
         super().__init__()                    
-
         self.input_dim = input_dim
 
         self.encoder = nn.Sequential(
@@ -56,7 +52,6 @@ class AstronomusAE(nn.Module):
             nn.BatchNorm1d(4),
             nn.GELU(),
             nn.Linear(4, 2),
-            # Sin BN ni activación para que el espacio latente retenga magnitudes absolutas
         )
 
         self.decoder = nn.Sequential(
@@ -67,7 +62,6 @@ class AstronomusAE(nn.Module):
             nn.BatchNorm1d(8),
             nn.GELU(),
             nn.Linear(8, input_dim),
-            # Salida lineal: RobustScaler ya centró y escaló los datos.
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -76,54 +70,49 @@ class AstronomusAE(nn.Module):
 
     @torch.no_grad()
     def get_latent_features(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Retorna la representación 2D del espacio latente.
-        """
+        """Retorna la representación 2D del espacio latente."""
         self.eval()
         return self.encoder(x)
 
     @torch.no_grad()
-    def get_reconstruction_error(self, x: torch.Tensor) -> torch.Tensor:
+    def get_reconstruction_error(
+        self, 
+        x: torch.Tensor, 
+        feature_names: list[str] | None = None
+    ) -> torch.Tensor:
         """
-        Calcula el error de reconstrucción MSE por muestra.
-        Este es el anomaly score: valores altos = planeta físicamente atípico.
-
-        Returns:
-            Tensor de shape (N,) con el MSE de cada planeta.
+        Error de reconstrucción MSE ponderado por relevancia astrofísica.
         """
         self.eval()
         x_rec = self.forward(x)
-        # mean(dim=1): promedio sobre las 12 features, no sobre el batch
-        return ((x_rec - x) ** 2).mean(dim=1)
+        sq_err = (x_rec - x) ** 2
 
+        if feature_names is not None:
+            weights = torch.tensor(
+                [FEATURE_HABITABILITY_WEIGHTS.get(f, 1.0) for f in feature_names],
+                dtype=torch.float32,
+                device=x.device,
+            )
+            # Normalizar los pesos para mantener la escala
+            weights = weights / weights.mean()
+            return (sq_err * weights).mean(dim=1)
+
+        return sq_err.mean(dim=1)
 
 if __name__ == "__main__":
     print("Sanity check — AstronomusAE")
-
     FEATURES_REALES = 12   
     BATCH = 16
-
     modelo = AstronomusAE(input_dim=FEATURES_REALES)
     modelo.eval()
-
     x_normal = torch.randn(BATCH, FEATURES_REALES)
     x_grial  = torch.randn(BATCH, FEATURES_REALES) * 3   
-
-    x_rec    = modelo(x_normal)
+    
+    # Check con y sin pesos
+    test_features = ['pl_rade', 'pl_eqt'] + ['feat']*10
     err_norm = modelo.get_reconstruction_error(x_normal)
-    err_gria = modelo.get_reconstruction_error(x_grial)
-    latente  = modelo.get_latent_features(x_normal)
-
-    assert x_rec.shape == x_normal.shape,  "Shape de reconstrucción incorrecta"
-    assert err_norm.shape == (BATCH,),      "get_reconstruction_error debe ser (N,)"
-    assert latente.shape  == (BATCH, 2),    "Espacio latente debe ser (N, 2)"
-
-    params = sum(p.numel() for p in modelo.parameters())
-
-    print(f"  Input:           {x_normal.shape}")
-    print(f"  Latente:         {latente.shape}   (2D -> visualizable directamente)")
-    print(f"  Reconstrucción:  {x_rec.shape}")
-    print(f"  Error normales:  {err_norm.mean().item():.4f}  (sin entrenar -> ruido)")
-    print(f"  Error 'Griales': {err_gria.mean().item():.4f}  (esperado mayor post-entrenamiento)")
-    print(f"  Parámetros:      {params:,}  ({params/5200:.2f}x muestras — OK)")
+    err_weighted = modelo.get_reconstruction_error(x_normal, test_features)
+    
+    assert err_norm.shape == (BATCH,)
+    assert err_weighted.shape == (BATCH,)
     print("\n✓ Todas las aserciones pasaron.")

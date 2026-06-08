@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 #==========================
 # CONSTANTES GLOBALES
 # ==========================
-RUTA_RAW = "data/raw"
+RUTA_RAW = "backend/data/raw"
 NOMBRE_CSV_PHL = "phl_exoplanet_catalog_2019.csv"
 
 # Función de descarga con manejo de errores y patrón Caché-Primero

@@ -59,10 +59,10 @@
 
         #hud { top: 24px; left: 24px; }
         .hud-title { font-family: var(--sans); font-weight: 200; font-size: 22px; letter-spacing: 6px; color: var(--gold); margin-bottom: 12px; }
-        .hud-row { display: flex; gap: 14px; align-items: baseline; font-size: 14px; letter-spacing: 2px; color: rgba(255,255,255,0.8); margin-bottom: 5px; }
-        .hud-row .val { color: rgba(255,255,255,0.8); font-size: 14px; }
-        .hud-row .grial { color: var(--gold); font-size: 14px; }
-        .hud-row .ia { color: var(--cyan); font-size: 14px; text-shadow: 0 0 8px var(--cyan); }
+        .hud-row { display: flex; gap: 14px; align-items: baseline; font-size: 16px; letter-spacing: 2px; color: rgba(255,255,255,0.8); margin-bottom: 5px; }
+        .hud-row .val { color: rgba(255,255,255,0.8); font-size: 16px; }
+        .hud-row .grial { color: var(--gold); font-size: 16px; }
+        .hud-row .ia { color: var(--cyan); font-size: 16px; text-shadow: 0 0 8px var(--cyan); }
         .hud-divider { width: 120px; height: 1px; background: var(--border); margin: 10px 0; }
 
         /* --- LEYENDA TÉRMICA --- */
@@ -74,6 +74,10 @@
         .legend-grial { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 16px; letter-spacing: 2px; color: rgba(255,255,255,0.8); }
         .grial-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 8px var(--gold); }
         .ia-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+        .exo-dot { width: 8px; height: 8px; border-radius: 50%; background: #e67e22; box-shadow: 0 0 8px #e67e22; }
+        .inh-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.4); }
+        .hud-row .exo { color: #e67e22; font-size: 16px; text-shadow: 0 0 8px #e67e22; }
+        .hud-row .inh { color: rgba(255,255,255,0.6); font-size: 16px; }
 
         #controls-hint { bottom: 24px; right: 24px; font-size: 13px; letter-spacing: 2px; color: rgba(255,255,255,0.8); text-align: right; line-height: 2.2; transition-delay: 0.7s; }
 
@@ -84,6 +88,14 @@
             display: none; white-space: nowrap; backdrop-filter: blur(4px); z-index: 200;
         }
         #tooltip .t-name { color: var(--gold); font-size: 11px; margin-bottom: 3px; }
+
+        @keyframes decodeText {
+            0% { opacity: 0; transform: translateX(-5px); }
+            100% { opacity: 1; transform: translateX(0); }
+        }
+        #tooltip > div {
+            animation: decodeText 0.15s ease-out forwards;
+        }
 
         /* --- EFECTOS DE POST-PROCESADO CSS --- */
         #scanlines { position: fixed; inset: 0; pointer-events: none; z-index: 50;
@@ -107,18 +119,22 @@
     <div id="hud">
         <div class="hud-title">EXOPLANET CATALOG</div>
         <div class="hud-row">TOTAL <span class="val" id="h-total">—</span></div>
-        <div class="hud-row">ETIQUETADOS <span class="val" id="h-labeled">—</span></div>
         <div class="hud-divider"></div>
-        <div class="hud-row">★ GRIALES PHL <span class="grial" id="h-griales">—</span></div>
         <div class="hud-row">♦ HALLAZGOS IA <span class="ia" id="h-ia-candidates">—</span></div>
+        <div class="hud-row">★ GRIALES PHL <span class="grial" id="h-griales">—</span></div>
+        <div class="hud-row">● EXÓTICOS <span class="exo" id="h-exoticos">—</span></div>
+        <div class="hud-row">○ INHÓSPITOS <span class="inh" id="h-inhospitos">—</span></div>
     </div>
 
     <div id="legend">
-        <div class="legend-title">TEMPERATURA ESTELAR</div>
+        <div class="legend-title">TEMPERATURA Y CLASIFICACIÓN</div>
         <div class="legend-bar"></div>
-        <div class="legend-labels"><span>2500K</span><span>M · K · G · F · A</span><span>10000K</span></div>
-        <div class="legend-grial"><div class="grial-dot"></div><span>GRIAL — TIERRA 2.0 (Etiquetado)</span></div>
-        <div class="legend-grial"><div class="ia-dot"></div><span>CANDIDATO IA — (IHP Alto)</span></div>
+        <div class="legend-labels"><span>2500K Estelar 10000K</span></div>
+        
+        <div class="legend-grial"><div class="ia-dot"></div><span>CLASE 3: HALLAZGO IA (Alto IHP)</span></div>
+        <div class="legend-grial"><div class="grial-dot"></div><span>CLASE 2: GRIAL (Tierra 2.0 PHL)</span></div>
+        <div class="legend-grial"><div class="exo-dot"></div><span>CLASE 1: EXÓTICO (Mundo Extremo)</span></div>
+        <div class="legend-grial"><div class="inh-dot"></div><span>CLASE 0: INHÓSPITO (Gas/Lava/Hielo)</span></div>
     </div>
 
     <div id="controls-hint">ARRASTRAR · ROTAR<br>SCROLL · ZOOM<br>HOVER · IDENTIFICAR</div>
@@ -143,6 +159,9 @@
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
         const API_URL = window.location.protocol === 'file:' ? 'http://localhost:8000/api/exoplanets' : '/api/exoplanets';
 
@@ -163,11 +182,40 @@
             new THREE.MeshBasicMaterial({ color: 0x0a0a14, wireframe: true, transparent: true, opacity: 0.07 })
         ));
 
+        const stardustCount = 3000;
+        const stardustPos = new Float32Array(stardustCount * 3);
+        for(let i=0; i < stardustCount * 3; i++) {
+            stardustPos[i] = (Math.random() - 0.5) * 800; // Distribución amplia por todo el espacio
+        }
+        const stardustGeo = new THREE.BufferGeometry();
+        stardustGeo.setAttribute('position', new THREE.BufferAttribute(stardustPos, 3));
+        const stardustMat = new THREE.PointsMaterial({ color: 0x444455, size: 0.3, transparent: true, opacity: 0.4 });
+        const stardust = new THREE.Points(stardustGeo, stardustMat);
+        scene.add(stardust);
+
+        // --- POST-PROCESADO (BLOOM) ---
+        const renderScene = new RenderPass(scene, camera);
+        // Parámetros: resolución, fuerza, radio, umbral
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.5, 0.4, 0.85);
+        bloomPass.threshold = 0.1; 
+        bloomPass.strength = 1.8; // Intensidad del brillo (ajusta a gusto)
+        bloomPass.radius = 0.5;
+
+        const composer = new EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true; controls.dampingFactor = 0.05;
         controls.minDistance = 15; controls.maxDistance = 700;
         let autoRotate = true; let autoRotateY = 0;
         controls.addEventListener('start', () => { autoRotate = false; });
+
+        // --- RETÍCULA DE SELECCIÓN ---
+        const reticleGeo = new THREE.RingGeometry(1.5, 1.8, 32); // Un anillo fino
+        const reticleMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0, side: THREE.DoubleSide });
+        const reticle = new THREE.Mesh(reticleGeo, reticleMat);
+        scene.add(reticle);
 
         // ==========================================
         // FÍSICA A COLOR
@@ -202,7 +250,15 @@
                 const data = await res.json();
 
                 // Incorporamos el IHP al catálogo local
-                catalog = { names: data.names, temps: data.temperatures, radii: data.radii, targets: data.target_classes, ihps: data.ihp };
+               catalog = { 
+                    names: data.names, 
+                    temps: data.temperatures, 
+                    radii: data.radii, 
+                    targets: data.target_classes, 
+                    ihps: data.ihp,
+                    score_ia: data.score_ia,        
+                    score_heller: data.score_heller 
+                };
                 
                 setStatus(`Procesando ${data.meta.total} cuerpos celestes...`, 70);
                 await new Promise(r => setTimeout(r, 50)); 
@@ -262,9 +318,10 @@
 
                 // Actualizar Textos HUD
                 document.getElementById('h-total').textContent = data.meta.total.toLocaleString('es-AR') + ' EXOPLANETAS';
-                document.getElementById('h-labeled').textContent = data.meta.labeled.toLocaleString('es-AR');
-                document.getElementById('h-griales').textContent = data.meta.griales + ' PLANETAS';
-                document.getElementById('h-ia-candidates').textContent = (data.meta.ia_candidates || 0) + ' DETECTADOS'; // Inyectamos conteo IA
+                document.getElementById('h-ia-candidates').textContent = (data.meta.ia_candidates || 0) + ' DETECTADOS';
+                document.getElementById('h-griales').textContent = (data.meta.griales || 0) + ' CONFIRMADOS';
+                document.getElementById('h-exoticos').textContent = (data.meta.exoticos || 0) + ' REGISTRADOS';
+                document.getElementById('h-inhospitos').textContent = (data.meta.inhospitos || 0) + ' DESCARTADOS';
 
                 setStatus('Catálogo inicializado', 100);
                 setTimeout(() => { 
@@ -309,22 +366,36 @@
                 
                 // Mostrar el IHP (Si es 0, no lo mostramos para los mundos inhóspitos confirmados)
                 const ihpVal = catalog.ihps[srcIdx] || 0;
-                document.getElementById('tt-ihp').textContent = ihpVal > 0 ? `IHP: ${ihpVal.toFixed(2)}%` : '';
+                const iaVal = catalog.score_ia[srcIdx] || 0;
+                const hellerVal = catalog.score_heller[srcIdx] || 0;
+                document.getElementById('tt-ihp').innerHTML = `
+                        <div style="color:var(--cyan)">IHP TOTAL: ${ihpVal}%</div>
+                        <div style="font-size:8px; opacity:0.7; margin-top:2px;">
+                        IA: ${iaVal}% | Heller: ${hellerVal}%
+                        </div>
+                    `;
                 
                 // Color y etiqueta del Tooltip
                 const grialText = document.getElementById('tt-grial');
-                grialText.textContent = tc === 3 ? '♦ DESCUBRIMIENTO IA' : tc === 2 ? '★ TIERRA 2.0 (GRIAL)' : tc === 1 ? 'Mundo Exótico' : tc === 0 ? 'Mundo Inhóspito' : 'Desconocido';
+                grialText.textContent = tc === 3 ? '♦ DESCUBRIMIENTO IA' : tc === 2 ? '★ TIERRA 2.0 (GRIAL)' : tc === 1 ? 'Mundo Exótico' : tc === 0 ? 'Mundo Inhóspito' : 'Mundo Inhóspito';
                 grialText.style.color = tc === 3 ? 'var(--cyan)' : tc === 2 ? 'var(--gold)' : 'rgba(255,255,255,0.4)';
 
                 tooltip.style.display = 'block'; document.body.style.cursor = 'pointer';
             } else {
-                tooltip.style.display = 'none'; document.body.style.cursor = 'crosshair';
+               reticle.material.opacity = 0; // Ocultar si no hay hover
+               tooltip.style.display = 'none'; document.body.style.cursor = 'crosshair';
             }
         }
 
         function animate() {
             requestAnimationFrame(animate);
-            if (autoRotate) { autoRotateY += 0.00025; scene.rotation.y = autoRotateY; }
+            if (autoRotate) { autoRotateY += 0.00050; scene.rotation.y = autoRotateY; }
+
+            if (stardust) {
+                stardust.rotation.y -= 0.01;
+                stardust.rotation.x += 0.05;
+            }
+
             renderHover(); controls.update(); renderer.render(scene, camera);
         }
 
