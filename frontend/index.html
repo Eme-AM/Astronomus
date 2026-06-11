@@ -49,6 +49,26 @@
         .target-title { font-size: 10px; color: rgba(255,255,255,0.5); letter-spacing: 2px; margin-bottom: 4px; }
         #t-selected-name { font-size: 16px; color: var(--cyan); letter-spacing: 2px; }
 
+        /* PANEL DE INFORMACIÓN DERECHO */
+        #info-panel {
+            position: fixed; top: 50%; right: 24px; transform: translateY(-50%);
+            width: 360px; background: rgba(0, 5, 12, 0.85);
+            border: 1px solid var(--border); border-left: 4px solid var(--cyan);
+            padding: 24px; z-index: 150; backdrop-filter: blur(8px);
+            display: none; flex-direction: column; gap: 12px;
+            box-shadow: -10px 0 40px rgba(0,0,0,0.6);
+            animation: slideInRight 0.3s forwards cubic-bezier(0.1, 0.9, 0.2, 1);
+        }
+        @keyframes slideInRight {
+            from { transform: translate(50px, -50%); opacity: 0; }
+            to { transform: translate(0, -50%); opacity: 1; }
+        }
+        .ip-type { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; }
+        .ip-name { font-family: var(--sans); font-size: 38px; font-weight: 200; color: #fff; letter-spacing: 2px; margin-bottom: -4px; }
+        .ip-stats { font-size: 15px; color: rgba(255,255,255,0.8); letter-spacing: 1px; }
+        .ip-desc { font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.6); margin-top: 10px; text-align: justify; }
+        .ip-footer { font-size: 10px; color: rgba(255,255,255,0.2); margin-top: 20px; letter-spacing: 2px; text-align: center; }
+
         /* Leyenda */
         #legend { bottom: 24px; left: 24px; transition-delay: 0.5s; }
         .legend-title { font-size: 16px; letter-spacing: 3px; color: rgba(255,255,255,0.8); margin-bottom: 8px; }
@@ -78,9 +98,27 @@
         #hand-cursor.pointing { border-color: var(--cyan); background: rgba(0, 212, 255, 0.1); }
         #hand-cursor.pinching { border-color: var(--gold); background: rgba(241, 196, 15, 0.4); transform: translate(-50%, -50%) scale(0.7); }
 
-        /* Tooltip & FX */
-        #tooltip { position: fixed; background: rgba(0,0,0,0.85); border: 1px solid var(--border); padding: 8px 12px; font-size: 10px; letter-spacing: 1px; color: rgba(255,255,255,0.8); pointer-events: none; display: none; white-space: nowrap; backdrop-filter: blur(4px); z-index: 200; }
-        #tooltip .t-name { color: var(--gold); font-size: 11px; margin-bottom: 3px; }
+        /* TOOLTIP (Cartelito flotante) */
+        #tooltip { 
+            position: fixed; 
+            background: rgba(0, 0, 0, 0.9); 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+            border-left: 4px solid var(--gold);
+            padding: 16px 20px; 
+            font-size: 14px; 
+            line-height: 1.5;
+            letter-spacing: 1.5px; 
+            color: rgba(255, 255, 255, 0.9); 
+            pointer-events: none; 
+            display: none; 
+            white-space: nowrap; 
+            backdrop-filter: blur(6px); 
+            z-index: 200; 
+            box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+        }
+        #tooltip .t-name { color: var(--gold); font-size: 18px; font-weight: bold; margin-bottom: 6px; }
+        #tt-grial { margin-top: 8px; letter-spacing: 2px; font-size: 12px; text-transform: uppercase; }
+
         #scanlines { position: fixed; inset: 0; pointer-events: none; z-index: 50; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px); }
         #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 49; background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.5) 100%); }
     </style>
@@ -109,6 +147,17 @@
         </div>
     </div>
 
+    <div id="info-panel">
+        <div id="ip-type" class="ip-type"></div>
+        <div id="ip-name" class="ip-name"></div>
+        <div class="ip-stats">
+            <span id="ip-teff"></span> • <span id="ip-rade"></span>
+        </div>
+        <div class="hud-divider" style="width: 100%; margin: 15px 0 5px 0;"></div>
+        <div id="ip-desc" class="ip-desc"></div>
+        <div class="ip-footer">SISTEMA ASTRONOMUS — DATOS TELEMÉTRICOS</div>
+    </div>
+
     <div id="legend">
         <div class="legend-title">TEMPERATURA ESTELAR</div>
         <div class="legend-bar"></div>
@@ -118,10 +167,9 @@
 
     <div id="controls-hint">
         <span style="color: rgba(255,255,255,0.5);">PUÑO CERRADO</span> · ROTAR 3D<br>
-        <span style="color: var(--cyan);">DEDO ÍNDICE</span> · APUNTAR<br>
-        <span style="color: var(--gold);">PELLIZCAR (🤏)</span> · SELECCIONAR<br>
+        <span style="color: var(--cyan);">MANO 1: ÍNDICE</span> · APUNTAR<br>
+        <span style="color: var(--gold);">MANO 2: PELLIZCAR (🤏)</span> · SELECCIONAR<br>
         <br>
-        <span style="color: #fff;">1 PUÑO + 1 ÍNDICE</span> · MULTITAREA<br>
         <span style="color: #fff;">2 MANOS ABIERTAS + SEPARAR</span> · ZOOM ESPACIAL
     </div>
 
@@ -134,8 +182,9 @@
 
     <div id="tooltip">
         <div class="t-name" id="tt-name"></div>
-        <div id="tt-teff"></div><div id="tt-rade"></div>
-        <div id="tt-grial" style="margin-top: 4px; letter-spacing: 2px; font-size: 9px;"></div>
+        <div id="tt-teff"></div>
+        <div id="tt-rade"></div>
+        <div id="tt-grial"></div>
     </div>
 
     <script>
@@ -178,13 +227,9 @@
             return [Math.min(1,r), Math.min(1,g), Math.min(1,b)];
         }
 
-        // ==========================================
-        // FUNCIÓN PARA GENERAR LA FORMA DE ESTRELLA
-        // ==========================================
         function createStarTexture() {
             const canvas = document.createElement('canvas');
-            canvas.width = 64;
-            canvas.height = 64;
+            canvas.width = 64; canvas.height = 64;
             const ctx = canvas.getContext('2d');
 
             const cx = 32, cy = 32, spikes = 5, outerRadius = 30, innerRadius = 12;
@@ -196,28 +241,17 @@
 
             ctx.moveTo(cx, cy - outerRadius);
             for (let i = 0; i < spikes; i++) {
-                x = cx + Math.cos(rot) * outerRadius;
-                y = cy + Math.sin(rot) * outerRadius;
-                ctx.lineTo(x, y);
-                rot += step;
-
-                x = cx + Math.cos(rot) * innerRadius;
-                y = cy + Math.sin(rot) * innerRadius;
-                ctx.lineTo(x, y);
-                rot += step;
+                x = cx + Math.cos(rot) * outerRadius; y = cy + Math.sin(rot) * outerRadius; ctx.lineTo(x, y); rot += step;
+                x = cx + Math.cos(rot) * innerRadius; y = cy + Math.sin(rot) * innerRadius; ctx.lineTo(x, y); rot += step;
             }
-            ctx.lineTo(cx, cy - outerRadius);
-            ctx.closePath();
+            ctx.lineTo(cx, cy - outerRadius); ctx.closePath();
 
-            // Gradiente para darle un efecto de brillo
             const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, outerRadius);
             gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
             gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.9)');
             gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
             
-            ctx.fillStyle = gradient;
-            ctx.fill();
-
+            ctx.fillStyle = gradient; ctx.fill();
             return new THREE.CanvasTexture(canvas);
         }
 
@@ -235,7 +269,6 @@
             const setStatus = (msg, pct) => { document.getElementById('status-msg').textContent = msg; document.getElementById('prog').style.width = pct + '%'; };
             setStatus('Conectando con la API...', 10);
 
-            // Generamos la textura de estrella antes de armar los materiales
             const starTexture = createStarTexture();
 
             try {
@@ -269,16 +302,9 @@
                 normGeo.setAttribute('position', new THREE.BufferAttribute(normPos, 3));
                 normGeo.setAttribute('color', new THREE.BufferAttribute(normCol, 3));
                 
-                // MATERIAL PARA ESTRELLAS NORMALES (con textura aplicada)
                 pointsRef = new THREE.Points(normGeo, new THREE.PointsMaterial({ 
-                    vertexColors: true, 
-                    size: 2.5, // Tamaño ajustado para la estrella
-                    sizeAttenuation: true, 
-                    transparent: true, 
-                    opacity: 0.88,
-                    map: starTexture,
-                    alphaTest: 0.05,
-                    depthWrite: false
+                    vertexColors: true, size: 2.5, sizeAttenuation: true, 
+                    transparent: true, opacity: 0.88, map: starTexture, alphaTest: 0.05, depthWrite: false
                 }));
                 pointsRef.userData.indexMap = normIdx;
                 spaceGroup.add(pointsRef);
@@ -288,15 +314,9 @@
                     grialIdx.forEach((src, dst) => { gPos[dst*3] = data.positions[src*3]; gPos[dst*3+1] = data.positions[src*3+1]; gPos[dst*3+2] = data.positions[src*3+2]; });
                     const gGeo = new THREE.BufferGeometry(); gGeo.setAttribute('position', new THREE.BufferAttribute(gPos, 3));
                     
-                    // MATERIAL PARA ESTRELLAS "GRIAL" (con textura aplicada)
                     grialPointsRef = new THREE.Points(gGeo, new THREE.PointsMaterial({ 
-                        color: 0xf1c40f, 
-                        size: 9.0, // Tamaño ajustado para la estrella
-                        sizeAttenuation: true,
-                        transparent: true,
-                        map: starTexture,
-                        alphaTest: 0.05,
-                        depthWrite: false
+                        color: 0xf1c40f, size: 9.0, sizeAttenuation: true,
+                        transparent: true, map: starTexture, alphaTest: 0.05, depthWrite: false
                     }));
                     grialPointsRef.userData.indexMap = grialIdx;
                     spaceGroup.add(grialPointsRef);
@@ -319,12 +339,8 @@
         // 3. IA DE MANOS MULTITAREA Y ZOOM
         // ==========================================
         let targetRotationX = 0; let targetRotationY = 0;
-        let isGrabbingSpace = false;
-        let wasPinching = false;
-        let lastZoomDist = 0;
-        
-        let smoothTargetX = window.innerWidth / 2;
-        let smoothTargetY = window.innerHeight / 2;
+        let isGrabbingSpace = false; let wasPinching = false; let lastZoomDist = 0;
+        let smoothTargetX = window.innerWidth / 2; let smoothTargetY = window.innerHeight / 2;
 
         const handCursor = document.getElementById('hand-cursor');
         const tooltip = document.getElementById('tooltip');
@@ -333,18 +349,13 @@
             const videoElement = document.getElementById("webcam");
             const statusText = document.getElementById("ai-status");
 
-            if (!window.Hands || !window.Camera) {
-                statusText.textContent = "Error de IA"; return;
-            }
+            if (!window.Hands || !window.Camera) { statusText.textContent = "Error de IA"; return; }
 
             const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
-            
             hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
 
             hands.onResults((results) => {
-                isGrabbingSpace = false;
-                handCursor.style.display = 'none';
-                virtualPointer.x = -999; 
+                isGrabbingSpace = false; handCursor.style.display = 'none'; virtualPointer.x = -999; 
                 
                 if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                     autoRotate = false; 
@@ -367,45 +378,45 @@
                         const pinkyCurled = Math.hypot(pinkyTip.x - wrist.x, pinkyTip.y - wrist.y) < Math.hypot(pinkyPip.x - wrist.x, pinkyPip.y - wrist.y) * 1.12;
                         
                         const curledCount = [indexCurled, middleCurled, ringCurled, pinkyCurled].filter(Boolean).length;
+
+                        const palmSize = Math.hypot(wrist.x - middleBase.x, wrist.y - middleBase.y);
+                        const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
+                        const indexToPalm = Math.hypot(indexTip.x - middleBase.x, indexTip.y - middleBase.y);
+
+                        const isPinching = (pinchDist < palmSize * 0.4) && (indexToPalm > palmSize * 0.6);
+                        const isPointing = !indexCurled && middleCurled && ringCurled && !isPinching;
+                        const isGrabbing = indexCurled && middleCurled && ringCurled && !isPinching;
                         
                         return {
                             hand, wrist, indexTip, middleBase,
-                            isGrabbing: thumbCurled && curledCount >= 3,
-                            isPointing: !indexCurled && middleCurled && ringCurled && pinkyCurled,
-                            isPinching: Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y) < 0.08,
-                            isOpen: !thumbCurled && curledCount === 0 // NUEVO: Estado de mano abierta
+                            isGrabbing: isGrabbing,
+                            isPointing: isPointing,
+                            isPinching: isPinching,
+                            isOpen: !thumbCurled && curledCount === 0
                         };
                     });
 
-                    // --- LÓGICA DE GESTOS COMPUESTOS ---
-
-                    // 1. ZOOM: Dos manos detectadas y AMBAS están ABIERTAS
                     if (parsedHands.length === 2 && parsedHands[0].isOpen && parsedHands[1].isOpen) {
-                        
-                        statusText.style.color = "var(--gold)";
-                        statusText.textContent = "Escalando (Zoom)";
-                        
+                        statusText.style.color = "var(--gold)"; statusText.textContent = "Escalando (Zoom)";
                         const dist = Math.hypot(parsedHands[0].wrist.x - parsedHands[1].wrist.x, parsedHands[0].wrist.y - parsedHands[1].wrist.y);
                         
                         if (lastZoomDist > 0) {
                             const delta = dist - lastZoomDist;
                             let currentRadius = camera.position.length();
-                            // Sensibilidad ajustada a 250 para evitar saltos bruscos
                             currentRadius -= delta * 250; 
                             currentRadius = Math.max(controls.minDistance, Math.min(controls.maxDistance, currentRadius));
                             camera.position.setLength(currentRadius);
                         }
-                        lastZoomDist = dist;
-                        wasPinching = false; 
+                        lastZoomDist = dist; wasPinching = false; 
 
                     } else {
-                        // 2. MULTITAREA: Asignación de roles a las manos
                         lastZoomDist = 0;
                         
+                        // SEPARACIÓN EXPLÍCITA DE MANOS
+                        const pointer = parsedHands.find(h => h.isPointing);
+                        const pincher = parsedHands.find(h => h.isPinching);
                         const grabber = parsedHands.find(h => h.isGrabbing);
-                        const pointer = parsedHands.find(h => h.isPointing || h.isPinching);
 
-                        // Rotación con sensibilidad ajustada a 1.0
                         if (grabber) {
                             isGrabbingSpace = true;
                             const h = grabber;
@@ -414,11 +425,10 @@
                             targetRotationY = -(handCenterX - 0.5) * Math.PI * 1.0;
                             targetRotationX = (handCenterY - 0.5) * Math.PI * 1.0;
                         } else {
-                            targetRotationY = spaceGroup.rotation.y;
-                            targetRotationX = spaceGroup.rotation.x;
+                            targetRotationY = spaceGroup.rotation.y; targetRotationX = spaceGroup.rotation.x;
                         }
 
-                        // Puntero con interpolación lineal (Lerp) para evitar temblores
+                        // LÓGICA DE APUNTADO Y CLIC A DOS MANOS
                         if (pointer) {
                             const screenX = (1 - pointer.indexTip.x) * window.innerWidth;
                             const screenY = pointer.indexTip.y * window.innerHeight;
@@ -427,38 +437,38 @@
                             smoothTargetY += (screenY - smoothTargetY) * 0.15;
 
                             handCursor.style.display = 'block';
-                            handCursor.style.left = `${smoothTargetX}px`;
-                            handCursor.style.top = `${smoothTargetY}px`;
+                            handCursor.style.left = `${smoothTargetX}px`; handCursor.style.top = `${smoothTargetY}px`;
                             
                             virtualPointer.x = (smoothTargetX / window.innerWidth) * 2 - 1;
                             virtualPointer.y = -(smoothTargetY / window.innerHeight) * 2 + 1;
-                            tooltip.style.left = `${smoothTargetX + 20}px`;
-                            tooltip.style.top = `${smoothTargetY - 10}px`;
+                            tooltip.style.left = `${smoothTargetX + 24}px`; tooltip.style.top = `${smoothTargetY - 16}px`;
 
-                            if (pointer.isPinching) {
+                            // Si detectamos un "pincher" (la otra mano haciendo pellizco), disparamos el clic
+                            if (pincher) {
                                 handCursor.className = 'pinching';
                                 if (!wasPinching) seleccionarEstrella();
                                 wasPinching = true;
-                            } else {
-                                handCursor.className = 'pointing';
-                                wasPinching = false;
+                            } else { 
+                                handCursor.className = 'pointing'; 
+                                wasPinching = false; 
                             }
-                        } else {
-                            wasPinching = false;
+                        } else { 
+                            wasPinching = false; 
                         }
                         
-                        if (grabber && pointer) {
-                            statusText.style.color = "var(--cyan)";
-                            statusText.textContent = pointer.isPinching ? "Rotando y Clic" : "Rotando y Apuntando";
+                        // FEEDBACK VISUAL IA
+                        if (pointer && pincher) {
+                            statusText.style.color = "var(--gold)"; statusText.textContent = "Apuntando y Clic (2 Manos)";
+                        } else if (grabber && pointer) {
+                            statusText.style.color = "var(--cyan)"; statusText.textContent = "Rotando y Apuntando";
                         } else if (grabber) {
-                            statusText.style.color = "white";
-                            statusText.textContent = "Rotando espacio";
+                            statusText.style.color = "white"; statusText.textContent = "Rotando espacio";
                         } else if (pointer) {
-                            statusText.style.color = pointer.isPinching ? "var(--gold)" : "var(--cyan)";
-                            statusText.textContent = pointer.isPinching ? "Clic detectado" : "Apuntando";
+                            statusText.style.color = "var(--cyan)"; statusText.textContent = "Apuntando (Esperando clic...)";
+                        } else if (pincher) {
+                            statusText.style.color = "gray"; statusText.textContent = "Falta mano para apuntar";
                         } else {
-                            statusText.style.color = "gray";
-                            statusText.textContent = parsedHands.length === 2 ? "2 Manos detectadas" : "1 Mano detectada";
+                            statusText.style.color = "gray"; statusText.textContent = parsedHands.length === 2 ? "2 Manos detectadas" : "1 Mano detectada";
                         }
                     }
 
@@ -469,11 +479,7 @@
                 }
             });
 
-            const cameraUtils = new Camera(videoElement, {
-                onFrame: async () => { await hands.send({ image: videoElement }); },
-                width: 320, height: 240
-            });
-
+            const cameraUtils = new Camera(videoElement, { onFrame: async () => { await hands.send({ image: videoElement }); }, width: 320, height: 240 });
             cameraUtils.start().then(() => { statusText.textContent = "Sistema IA Listo"; });
         }
 
@@ -482,10 +488,8 @@
         // ==========================================
         window.addEventListener('mousemove', (e) => {
             if (virtualPointer.x === -999) {
-                virtualPointer.x = (e.clientX / innerWidth) * 2 - 1; 
-                virtualPointer.y = -(e.clientY / innerHeight) * 2 + 1;
-                tooltip.style.left = `${e.clientX + 14}px`; 
-                tooltip.style.top = `${e.clientY - 10}px`;
+                virtualPointer.x = (e.clientX / innerWidth) * 2 - 1; virtualPointer.y = -(e.clientY / innerHeight) * 2 + 1;
+                tooltip.style.left = `${e.clientX + 24}px`; tooltip.style.top = `${e.clientY - 16}px`;
             }
         });
         
@@ -494,15 +498,42 @@
         function seleccionarEstrella() {
             if (hoveredStarIndex !== null) {
                 const nombre = catalog.names[hoveredStarIndex] || 'Desconocido';
+                const teff = Math.round(catalog.temps[hoveredStarIndex] || 0);
+                const radio = (catalog.radii[hoveredStarIndex] || 0).toFixed(2);
+                const tc = catalog.targets[hoveredStarIndex];
+
                 document.getElementById('target-panel').style.display = 'block';
                 document.getElementById('t-selected-name').textContent = nombre;
+
+                const typeText = tc === 2 ? '★ Tierra 2.0 (Habitable)' : tc === 1 ? 'Mundo Exótico' : tc === 0 ? 'Mundo Inhóspito' : 'Desconocido';
+                const typeColor = tc === 2 ? 'var(--gold)' : tc === 1 ? 'var(--cyan)' : 'rgba(255,255,255,0.5)';
+
+                let desc = `Este sistema exoplanetario orbita una estrella principal con una temperatura superficial de ${teff}K. `;
+                if (tc === 2) desc += `Con un radio estimado de ${radio} masas terrestres y orbitando en la zona de habitabilidad de su sistema, es un fuerte candidato para albergar agua líquida y condiciones favorables para la vida tal como la conocemos.`;
+                else if (tc === 1) desc += `Sus características anómalas y su tamaño de ${radio} R⊕ lo categorizan como un mundo exótico, sugiriendo una composición química inusual o densas capas atmosféricas.`;
+                else desc += `Debido a la radiación estelar y su radio de ${radio} R⊕, las condiciones son extremadamente hostiles. Probablemente se trate de un gigante gaseoso abrasador o una roca estéril sin atmósfera.`;
+
+                const infoPanel = document.getElementById('info-panel');
+                
+                const ipType = document.getElementById('ip-type');
+                ipType.textContent = typeText;
+                ipType.style.color = typeColor;
+                
+                document.getElementById('ip-name').textContent = nombre;
+                document.getElementById('ip-teff').textContent = `TEMP ESTELAR: ${teff} K`;
+                document.getElementById('ip-rade').textContent = `RADIO PLANETARIO: ${radio} R⊕`;
+                document.getElementById('ip-desc').textContent = desc;
+                
+                infoPanel.style.borderLeftColor = typeColor;
+                infoPanel.style.display = 'flex';
+            } else {
+                document.getElementById('target-panel').style.display = 'none';
+                document.getElementById('info-panel').style.display = 'none';
             }
         }
 
         function renderHover() {
-            if (!pointsRef || virtualPointer.x === -999) { 
-                tooltip.style.display = 'none'; hoveredStarIndex = null; return; 
-            }
+            if (!pointsRef || virtualPointer.x === -999) { tooltip.style.display = 'none'; hoveredStarIndex = null; return; }
             
             raycaster.setFromCamera(virtualPointer, camera);
             const targets = grialPointsRef ? [pointsRef, grialPointsRef] : [pointsRef];
@@ -522,23 +553,16 @@
                 grialText.style.color = tc === 2 ? 'var(--gold)' : 'rgba(255,255,255,0.4)';
 
                 tooltip.style.display = 'block'; document.body.style.cursor = 'pointer';
-            } else {
-                tooltip.style.display = 'none'; document.body.style.cursor = 'crosshair';
-                hoveredStarIndex = null;
-            }
+            } else { tooltip.style.display = 'none'; document.body.style.cursor = 'crosshair'; hoveredStarIndex = null; }
         }
 
         function animate() {
             requestAnimationFrame(animate);
-            
-            if (autoRotate) { 
-                autoRotateY += 0.00025; spaceGroup.rotation.y = autoRotateY; 
-            } else if (isGrabbingSpace) {
-                // Inercia ajustada a 0.04 para frenar suavemente como si el espacio fuera "pesado"
+            if (autoRotate) { autoRotateY += 0.00025; spaceGroup.rotation.y = autoRotateY; } 
+            else if (isGrabbingSpace) {
                 spaceGroup.rotation.y += (targetRotationY - spaceGroup.rotation.y) * 0.04;
                 spaceGroup.rotation.x += (targetRotationX - spaceGroup.rotation.x) * 0.04;
             }
-
             renderHover(); controls.update(); renderer.render(scene, camera);
         }
 
