@@ -11,7 +11,6 @@ from src.data.preparation import ejecutar_preparacion_target
 HOLA
 Si estás leyendo esto es porque acabás de clonar el repo e intuitivamente te metiste al primer Main que viste.
 Este código se encarga de ejecutar el pipeline de la manera más amigable posible para que no tengas que ir archivo por archivo.
-Hasta ahora la DNN no está implementada, si querés podés ir viendo eso.
 '''
 
 # Configuración del logger principal
