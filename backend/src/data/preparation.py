@@ -8,6 +8,9 @@ from sklearn.preprocessing import RobustScaler
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S')
 
+# ==========================================
+# CONFIGURACIÓN GLOBALES Y CONSTANTES
+# ==========================================
 RUTA_SILVER = "backend/data/silver/data_lake_consolidado.csv"
 RUTA_GOLD_DIR = "backend/data/gold"
 ARCHIVO_PREPARADO = f"{RUTA_GOLD_DIR}/dataset_preparado_ml.csv"
