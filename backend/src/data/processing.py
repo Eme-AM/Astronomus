@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 import warnings
+import joblib
 import pandas as pd
 import numpy as np
 from scipy.spatial import cKDTree
@@ -199,8 +200,14 @@ def imputar_datos(master_df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     # --- NIVEL 3: Machine Learning (MICE) ---
     estimador = ExtraTreesRegressor(n_estimators=10, random_state=SEMILLA_ALEATORIA)
     imputador_mice = IterativeImputer(estimator=estimador, max_iter=MICE_ITERACIONES, random_state=SEMILLA_ALEATORIA)
-    
+
     master_df[COLS_FISICAS_MICE] = imputador_mice.fit_transform(master_df[COLS_FISICAS_MICE])
+
+    # Serializar el imputer fitted para uso en inferencia: permite llamar solo
+    # .transform() sobre datos nuevos sin re-fit sobre datos mezclados (data leakage)
+    ruta_artifacts = os.path.join(os.path.dirname(__file__), "../../../artifacts")
+    os.makedirs(ruta_artifacts, exist_ok=True)
+    joblib.dump(imputador_mice, os.path.join(ruta_artifacts, "mice_imputer.pkl"))
     
     nulos_fase_3 = master_df[COLS_FISICAS_MICE].isna().sum().sum()
     imputados_mice = nulos_fase_2 - nulos_fase_3

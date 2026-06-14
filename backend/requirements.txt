@@ -1,18 +1,20 @@
 # Data Science & Math
-pandas
-numpy
-scikit-learn
-torch
-torchvision
+pandas==2.3.1
+numpy==2.2.5
+scikit-learn==1.7.2
+scipy==1.15.2
+torch==2.11.0
 
-# API & Web 
-fastapi
-uvicorn
-pydantic
-gradio
+# API & Web
+fastapi==0.136.1
+uvicorn==0.48.0
+pydantic==2.13.3
 
 # Utilities
-joblib
-requests
-matplotlib
-seaborn
+joblib==1.5.3
+requests==2.25.1
+kagglehub==1.0.1
+
+# Visualización (solo pipeline, no API)
+matplotlib==3.10.1
+seaborn==0.13.2

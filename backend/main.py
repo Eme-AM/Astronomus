@@ -1,7 +1,8 @@
 import argparse
 import logging
+import os
 import sys
-import uvicorn # <-- Importamos uvicorn
+import uvicorn
 
 from src.data.ingestion import ejecutar_ingesta
 from src.data.processing import ejecutar_procesamiento
@@ -47,11 +48,12 @@ def levantar_servidor():
     logger.info("=== INICIANDO SERVIDOR WEB ASTRONOMUS ===")
     logger.info("El catálogo 3D estará disponible en http://127.0.0.1:8000")
     
-    # Equivalente exacto a tu comando de consola
+    # reload solo activo fuera de producción: ENV=production lo desactiva
+    is_production = os.getenv("ENV", "development") == "production"
     uvicorn.run(
-        "api.app:app", 
-        app_dir="backend/src", 
-        reload=True, 
+        "api.app:app",
+        app_dir="backend/src",
+        reload=not is_production,
         port=8000
     )
 

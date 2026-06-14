@@ -81,8 +81,10 @@ def escalar_y_exportar(df_ml: pd.DataFrame) -> ArtefactosML:
     y = df_ml['target_class']
     X_log = _aplicar_log_transform(X)
 
-    # Entrenar el escalador SOLO con datos normales (evita sesgo por Griales)
-    mask_para_scaler = y != 2
+    # Entrenar el escalador SOLO con planetas etiquetados no-excepcionales (clases 0 y 1).
+    # Excluir clase -1 (desconocidos) evita que posibles Griales sin etiquetar sesguen
+    # los percentiles del scaler. Excluir clase 2 (Grial) es el criterio original.
+    mask_para_scaler = (y == 0) | (y == 1)
     escalador = RobustScaler()
     escalador.fit(X_log[mask_para_scaler])
     

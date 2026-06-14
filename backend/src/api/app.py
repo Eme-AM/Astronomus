@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import logging
+import os
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,10 +25,13 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configuración CORS (Permite que el frontend consulte a la API)
+# Configuración CORS — restringe al origen definido por CORS_ORIGIN.
+# En desarrollo local la variable no es necesaria (default: localhost:8000).
+# En producción: export CORS_ORIGIN=https://mi-dominio.com
+_cors_origins = os.getenv("CORS_ORIGIN", "http://localhost:8000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # ADVERTENCIA: En producción, restringir al dominio real
+    allow_origins=_cors_origins,
     allow_methods=["GET", "OPTIONS"],
     allow_headers=["*"],
 )
@@ -60,12 +64,7 @@ def serve_viewer() -> FileResponse | JSONResponse:
 # ==========================================
 @app.get("/health", tags=["ops"])
 def health_check() -> dict:
-    """Endpoint para auditoría de MLOps y monitoreo de infraestructura."""
-    return {
-        "status": "operativo",
-        "service": "Astronomus API",
-        "silver_layer_ready": Path("backend/data/silver/data_lake_consolidado.csv").exists(),
-        "gold_layer_ready": Path("backend/data/gold/dataset_preparado_ml.csv").exists(),
-    }
+    """Endpoint de salud para monitoreo de infraestructura."""
+    return {"status": "operativo", "service": "Astronomus API"}
 
 # Para ejecutar: uvicorn backend/src.api.app:app --reload --port 8000

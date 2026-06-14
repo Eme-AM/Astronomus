@@ -52,7 +52,15 @@ def ejecutar_pipeline_hibrido():
     # ==========================================
     logging.info("--- Fase 1: Entrenamiento Autoencoder ---")
     dataset_ae = ExoplanetUnsupervisedDataset(X_train_normales)
-    dataloader = DataLoader(dataset_ae, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
+    dataloader = DataLoader(
+        dataset_ae,
+        batch_size=BATCH_SIZE,
+        shuffle=True,
+        drop_last=True,
+        num_workers=2,
+        pin_memory=device.type == "cuda",
+        persistent_workers=True,
+    )
     
     modelo_ae = AstronomusAE(input_dim=len(features)).to(device)
     criterio = nn.MSELoss()
@@ -107,8 +115,10 @@ def ejecutar_pipeline_hibrido():
     
     df_ranking = df_completo_oro.merge(df_scores, on='pl_name', how='left')
     
-    ae_norm = (df_ranking['ae_score'] - df_ranking['ae_score'].min()) / (df_ranking['ae_score'].max() - df_ranking['ae_score'].min())
-    if_norm = (df_ranking['if_score'] - df_ranking['if_score'].min()) / (df_ranking['if_score'].max() - df_ranking['if_score'].min())
+    ae_denom = df_ranking['ae_score'].max() - df_ranking['ae_score'].min()
+    if_denom = df_ranking['if_score'].max() - df_ranking['if_score'].min()
+    ae_norm = (df_ranking['ae_score'] - df_ranking['ae_score'].min()) / (ae_denom + 1e-8)
+    if_norm = (df_ranking['if_score'] - df_ranking['if_score'].min()) / (if_denom + 1e-8)
     
     df_ranking['hybrid_score'] = (0.7 * ae_norm) + (0.3 * if_norm)
 
