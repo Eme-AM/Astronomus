@@ -103,9 +103,9 @@ def get_exoplanets() -> JSONResponse:
         "target_classes": silver["target_class"].tolist(),
         
         # Enviamos el IHP
-        "ihp":            silver["ihp"].tolist(),
-        "score_ia":       silver["score_ia"].tolist(),      
-        "score_heller":   silver["score_heller"].tolist(),  
+        "ihp":          silver.get("ihp", pd.Series([])).tolist(),
+        "score_ia":     silver.get("score_ia", pd.Series([])).tolist(),
+        "score_heller": silver.get("score_heller", pd.Series([])).tolist(), 
         "names":          silver["pl_name"].astype(str).tolist(),
     }
 
