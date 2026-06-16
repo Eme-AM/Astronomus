@@ -190,6 +190,29 @@
     <script>
         const API_URL = window.location.protocol === 'file:' ? 'http://localhost:8000/api/exoplanets' : '/api/exoplanets';
 
+
+        const disposables = [];
+        let animFrameId = null;
+        let cameraUtilsRef = null;
+        let handsRef = null;
+
+        function cleanupWebGL() {
+            disposables.forEach(obj => obj.dispose());
+            disposables.length = 0;
+            if (pointsRef) { spaceGroup.remove(pointsRef); pointsRef = null; }
+            if (grialPointsRef) { spaceGroup.remove(grialPointsRef); grialPointsRef = null; }
+        }
+
+        function cleanupAll() {
+            cancelAnimationFrame(animFrameId);
+            if (cameraUtilsRef) cameraUtilsRef.stop();
+            if (handsRef) handsRef.close();
+            cleanupWebGL();
+            renderer.dispose();
+        }
+
+        window.addEventListener('beforeunload', cleanupAll);
+
         // ==========================================
         // 1. MOTOR GRÁFICO (Three.js Setup)
         // ==========================================
@@ -197,6 +220,12 @@
         renderer.setSize(innerWidth, innerHeight);
         renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
         document.body.appendChild(renderer.domElement);
+
+        renderer.domElement.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault();
+            cancelAnimationFrame(animFrameId);
+        });
+        renderer.domElement.addEventListener('webglcontextrestored', () => { animate(); });
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 2000);
@@ -269,7 +298,9 @@
             const setStatus = (msg, pct) => { document.getElementById('status-msg').textContent = msg; document.getElementById('prog').style.width = pct + '%'; };
             setStatus('Conectando con la API...', 10);
 
+            cleanupWebGL();
             const starTexture = createStarTexture();
+            disposables.push(starTexture);
 
             try {
                 const res = await fetch(API_URL).catch(() => {
@@ -302,10 +333,12 @@
                 normGeo.setAttribute('position', new THREE.BufferAttribute(normPos, 3));
                 normGeo.setAttribute('color', new THREE.BufferAttribute(normCol, 3));
                 
-                pointsRef = new THREE.Points(normGeo, new THREE.PointsMaterial({ 
-                    vertexColors: true, size: 2.5, sizeAttenuation: true, 
+                const normMat = new THREE.PointsMaterial({
+                    vertexColors: true, size: 2.5, sizeAttenuation: true,
                     transparent: true, opacity: 0.88, map: starTexture, alphaTest: 0.05, depthWrite: false
-                }));
+                });
+                disposables.push(normGeo, normMat);
+                pointsRef = new THREE.Points(normGeo, normMat);
                 pointsRef.userData.indexMap = normIdx;
                 spaceGroup.add(pointsRef);
 
@@ -313,11 +346,12 @@
                     const gPos = new Float32Array(grialIdx.length * 3);
                     grialIdx.forEach((src, dst) => { gPos[dst*3] = data.positions[src*3]; gPos[dst*3+1] = data.positions[src*3+1]; gPos[dst*3+2] = data.positions[src*3+2]; });
                     const gGeo = new THREE.BufferGeometry(); gGeo.setAttribute('position', new THREE.BufferAttribute(gPos, 3));
-                    
-                    grialPointsRef = new THREE.Points(gGeo, new THREE.PointsMaterial({ 
+                    const grialMat = new THREE.PointsMaterial({
                         color: 0xf1c40f, size: 9.0, sizeAttenuation: true,
                         transparent: true, map: starTexture, alphaTest: 0.05, depthWrite: false
-                    }));
+                    });
+                    disposables.push(gGeo, grialMat);
+                    grialPointsRef = new THREE.Points(gGeo, grialMat);
                     grialPointsRef.userData.indexMap = grialIdx;
                     spaceGroup.add(grialPointsRef);
                 }
@@ -351,10 +385,10 @@
 
             if (!window.Hands || !window.Camera) { statusText.textContent = "Error de IA"; return; }
 
-            const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
-            hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+            handsRef = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+            handsRef.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
 
-            hands.onResults((results) => {
+            handsRef.onResults((results) => {
                 isGrabbingSpace = false; handCursor.style.display = 'none'; virtualPointer.x = -999; 
                 
                 if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
@@ -479,8 +513,8 @@
                 }
             });
 
-            const cameraUtils = new Camera(videoElement, { onFrame: async () => { await hands.send({ image: videoElement }); }, width: 320, height: 240 });
-            cameraUtils.start().then(() => { statusText.textContent = "Sistema IA Listo"; });
+            cameraUtilsRef = new Camera(videoElement, { onFrame: async () => { await handsRef.send({ image: videoElement }); }, width: 320, height: 240 });
+            cameraUtilsRef.start().then(() => { statusText.textContent = "Sistema IA Listo"; });
         }
 
         // ==========================================
@@ -557,7 +591,7 @@
         }
 
         function animate() {
-            requestAnimationFrame(animate);
+            animFrameId = requestAnimationFrame(animate);
             if (autoRotate) { autoRotateY += 0.00025; spaceGroup.rotation.y = autoRotateY; } 
             else if (isGrabbingSpace) {
                 spaceGroup.rotation.y += (targetRotationY - spaceGroup.rotation.y) * 0.04;
