@@ -1,0 +1,6 @@
+metrica,valor
+Accuracy,0.9975
+Precision,0.3333
+Recall,0.4
+F1,0.3636
+Umbral_IHP,45.81

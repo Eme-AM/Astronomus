@@ -1,0 +1,76 @@
+======================================================================
+ MÉTRICAS DEL MODELO REAL — Detección de anomalías + ranking (IHP)
+======================================================================
+ Universo etiquetado: 2759 planetas (clase 0=2729, 1=25, 2/Grial=5)
+ Catálogo total rankeado: 6278 planetas
+
+----------------------------------------------------------------------
+ 1. PODER DE RANKING (ROC-AUC y PR-AUC / Average Precision)
+    Pregunta: ¿la señal rankea arriba a los positivos reales?
+----------------------------------------------------------------------
+
+  Objetivo: GRIAL (clase 2)  (positivos=5)
+    Señal                          ROC-AUC    PR-AUC
+    Rareza IA (AE + IsoForest)      0.8687    0.0078
+    Física (Heller ≈ ESI)           0.9922    0.3882
+    IHP (combinado)                 0.9936    0.4017
+
+  Objetivo: HABITABLE (clase 1∪2)  (positivos=30)
+    Señal                          ROC-AUC    PR-AUC
+    Rareza IA (AE + IsoForest)      0.7784    0.0286
+    Física (Heller ≈ ESI)           0.9513    0.3094
+    IHP (combinado)                 0.9682    0.3483
+
+----------------------------------------------------------------------
+ 2. PRECISION@k / RECALL@k — recuperando los Griales por IHP
+----------------------------------------------------------------------
+        k   #Griales en top-k   Precision@k    Recall@k
+       10                   3        0.3000      0.6000
+       20                   3        0.1500      0.6000
+       50                   4        0.0800      0.8000
+      100                   5        0.0500      1.0000
+
+----------------------------------------------------------------------
+ 3. POSICIÓN DE LOS GRIALES CONOCIDOS (ranking por IHP, universo etiquetado)
+----------------------------------------------------------------------
+    pl_name              IHP    rank   percentil
+    Kepler-442 b       49.86       1      100.0%
+    Kepler-1652 b      45.88       4       99.9%
+    Kepler-452 b       41.77      10       99.6%
+    GJ 1061 b          37.84      35       98.7%
+    GJ 273 c           35.30      53       98.1%
+
+----------------------------------------------------------------------
+ 4. VISTA CLASIFICACIÓN (Clase #8): umbral del modelo (cuantil 0.96 de IHP>0)
+    Convierte el ranking en decisión binaria: ¿candidato excepcional?
+----------------------------------------------------------------------
+    Umbral IHP = 45.81
+                pred: no-cand  pred: candidato
+real: NO Grial           2750                4
+real: Grial                 3                2
+
+    Accuracy  (aciertos totales / total):                        0.9975   <- engañoso: el 99.8% son no-Grial
+    Precision (de los marcados candidatos, ¿cuántos son Grial): 0.3333  (2/6)
+    Recall    (de los Griales, ¿cuántos marcó):                  0.4000
+    F1                                                           0.3636
+
+----------------------------------------------------------------------
+ 5. ¿QUIÉN HACE EL TRABAJO? — IA no supervisada vs física (Heller)
+----------------------------------------------------------------------
+    Correlación score_heller ↔ phl_esi : +0.773
+    Correlación score_ia     ↔ phl_esi : -0.193
+    Nota: el índice de Heller se construye con la misma física que el ESI, y
+    el Grial se DEFINE por ESI>=0.80. Si su AUC es alto pero el de score_ia no,
+    significa que quien 'encuentra' los Griales es la FÍSICA, no la IA.
+
+----------------------------------------------------------------------
+ 6. R² SCORE (vista regresión) — varianza del ESI explicada por cada señal
+    El modelo no es un regresor, pero su score es continuo: medimos cuánta
+    varianza del ESI (target continuo) explica un ajuste lineal de cada señal.
+----------------------------------------------------------------------
+    Señal                               R²
+    Rareza IA (AE + IsoForest)      0.0371
+    Física (Heller ≈ ESI)           0.5977
+    IHP (combinado)                 0.2704
+    (R² alto en 'Física' confirma la circularidad Heller≈ESI; bajo en 'Rareza IA'.)
+======================================================================
