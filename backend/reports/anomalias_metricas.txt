@@ -11,15 +11,15 @@
 
   Objetivo: GRIAL (clase 2)  (positivos=5)
     Señal                          ROC-AUC    PR-AUC
-    Rareza IA (AE + IsoForest)      0.8687    0.0078
+    Rareza IA (AE + IsoForest)      0.8686    0.0078
     Física (Heller ≈ ESI)           0.9922    0.3882
     IHP (combinado)                 0.9936    0.4017
 
   Objetivo: HABITABLE (clase 1∪2)  (positivos=30)
     Señal                          ROC-AUC    PR-AUC
-    Rareza IA (AE + IsoForest)      0.7784    0.0286
+    Rareza IA (AE + IsoForest)      0.7787    0.0286
     Física (Heller ≈ ESI)           0.9513    0.3094
-    IHP (combinado)                 0.9682    0.3483
+    IHP (combinado)                 0.9683    0.3492
 
 ----------------------------------------------------------------------
  2. PRECISION@k / RECALL@k — recuperando los Griales por IHP
@@ -35,9 +35,9 @@
 ----------------------------------------------------------------------
     pl_name              IHP    rank   percentil
     Kepler-442 b       49.86       1      100.0%
-    Kepler-1652 b      45.88       4       99.9%
-    Kepler-452 b       41.77      10       99.6%
-    GJ 1061 b          37.84      35       98.7%
+    Kepler-1652 b      45.86       4       99.9%
+    Kepler-452 b       41.84      10       99.6%
+    GJ 1061 b          37.82      35       98.7%
     GJ 273 c           35.30      53       98.1%
 
 ----------------------------------------------------------------------
@@ -58,7 +58,7 @@ real: Grial                 3                2
  5. ¿QUIÉN HACE EL TRABAJO? — IA no supervisada vs física (Heller)
 ----------------------------------------------------------------------
     Correlación score_heller ↔ phl_esi : +0.773
-    Correlación score_ia     ↔ phl_esi : -0.193
+    Correlación score_ia     ↔ phl_esi : -0.192
     Nota: el índice de Heller se construye con la misma física que el ESI, y
     el Grial se DEFINE por ESI>=0.80. Si su AUC es alto pero el de score_ia no,
     significa que quien 'encuentra' los Griales es la FÍSICA, no la IA.
@@ -69,7 +69,7 @@ real: Grial                 3                2
     varianza del ESI (target continuo) explica un ajuste lineal de cada señal.
 ----------------------------------------------------------------------
     Señal                               R²
-    Rareza IA (AE + IsoForest)      0.0371
+    Rareza IA (AE + IsoForest)      0.0369
     Física (Heller ≈ ESI)           0.5977
     IHP (combinado)                 0.2704
     (R² alto en 'Física' confirma la circularidad Heller≈ESI; bajo en 'Rareza IA'.)

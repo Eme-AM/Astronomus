@@ -1,7 +1,7 @@
 objetivo,senal,roc_auc,pr_auc
-GRIAL (clase 2),score_ia,0.8687,0.0078
+GRIAL (clase 2),score_ia,0.8686,0.0078
 GRIAL (clase 2),score_heller,0.9922,0.3882
 GRIAL (clase 2),ihp,0.9936,0.4017
-HABITABLE (clase 1∪2),score_ia,0.7784,0.0286
+HABITABLE (clase 1∪2),score_ia,0.7787,0.0286
 HABITABLE (clase 1∪2),score_heller,0.9513,0.3094
-HABITABLE (clase 1∪2),ihp,0.9682,0.3483
+HABITABLE (clase 1∪2),ihp,0.9683,0.3492
