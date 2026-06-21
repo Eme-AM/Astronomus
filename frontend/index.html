@@ -7,139 +7,26 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@200;400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/astronomus.css">
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
-    <style>
-        :root {
-            --gold: #f1c40f; --cyan: #00d4ff; --red: #e74c3c;
-            --border: rgba(255, 255, 255, 0.06);
-            --mono: 'Share Tech Mono', monospace;
-            --sans: 'Exo 2', sans-serif;
+    <script type="importmap">
+    {
+        "imports": {
+            "three":          "https://unpkg.com/three@0.162.0/build/three.module.js",
+            "three/addons/":  "https://unpkg.com/three@0.162.0/examples/jsm/"
         }
-
-        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #000; overflow: hidden; font-family: var(--mono); color: #fff; cursor: crosshair; }
-        canvas { display: block; }
-
-        /* Pantalla Carga */
-        #overlay { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; z-index: 100; transition: opacity 0.8s ease; }
-        #overlay.fade-out { opacity: 0; pointer-events: none; }
-        .logo { font-family: var(--sans); font-weight: 200; font-size: 42px; letter-spacing: 14px; text-transform: uppercase; }
-        .logo span { color: var(--gold); }
-        .tagline { font-size: 14px; letter-spacing: 3px; color: rgba(255,255,255,0.8); text-transform: uppercase; }
-        #status-msg { font-size: 12px; letter-spacing: 2px; color: rgba(255,255,255,0.8); min-height: 18px; }
-        .progress-track { width: 240px; height: 1px; background: rgba(255,255,255,0.08); position: relative; }
-        .progress-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); width: 0%; transition: width 0.4s ease; box-shadow: 0 0 8px var(--gold); }
-
-        /* HUD */
-        #hud, #legend, #controls-hint, #webcam-container { position: fixed; opacity: 0; transition: opacity 1s ease 0.4s; pointer-events: none; }
-        #hud.show, #legend.show, #controls-hint.show, #webcam-container.show { opacity: 1; }
-        #hud { top: 24px; left: 24px; }
-        .hud-title { font-family: var(--sans); font-weight: 200; font-size: 22px; letter-spacing: 6px; color: var(--gold); margin-bottom: 12px; }
-        .hud-row { display: flex; gap: 14px; align-items: baseline; font-size: 16px; letter-spacing: 2px; color: rgba(255,255,255,0.8); margin-bottom: 5px; }
-        .hud-row .val { color: rgba(255,255,255,0.8); font-size: 16px; }
-        .hud-row .grial { color: var(--gold); font-size: 16px; }
-        .hud-row .ia { color: var(--cyan); font-size: 16px; text-shadow: 0 0 8px var(--cyan); }
-        .hud-divider { width: 120px; height: 1px; background: var(--border); margin: 10px 0; }
-        
-        .hud-row .exo { color: #e67e22; font-size: 16px; text-shadow: 0 0 8px #e67e22; }
-        .hud-row .inh { color: rgba(255,255,255,0.6); font-size: 16px; }
-
-        #target-panel { display: none; margin-top: 15px; padding: 10px; background: rgba(0, 212, 255, 0.1); border-left: 3px solid var(--cyan); }
-        .target-title { font-size: 10px; color: rgba(255,255,255,0.5); letter-spacing: 2px; margin-bottom: 4px; }
-        #t-selected-name { font-size: 16px; color: var(--cyan); letter-spacing: 2px; }
-
-        /* PANEL DE INFORMACIÓN DERECHO */
-        #info-panel {
-            position: fixed; top: 50%; right: 24px; transform: translateY(-50%);
-            width: 360px; background: rgba(0, 5, 12, 0.85);
-            border: 1px solid var(--border); border-left: 4px solid var(--cyan);
-            padding: 24px; z-index: 150; backdrop-filter: blur(8px);
-            display: none; flex-direction: column; gap: 12px;
-            box-shadow: -10px 0 40px rgba(0,0,0,0.6);
-            animation: slideInRight 0.3s forwards cubic-bezier(0.1, 0.9, 0.2, 1);
-        }
-        @keyframes slideInRight {
-            from { transform: translate(50px, -50%); opacity: 0; }
-            to { transform: translate(0, -50%); opacity: 1; }
-        }
-        .ip-type { font-size: 11px; letter-spacing: 3px; text-transform: uppercase; }
-        .ip-name { font-family: var(--sans); font-size: 38px; font-weight: 200; color: #fff; letter-spacing: 2px; margin-bottom: -4px; }
-        .ip-stats { font-size: 15px; color: rgba(255,255,255,0.8); letter-spacing: 1px; }
-        .ip-desc { font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.6); margin-top: 10px; text-align: justify; }
-        .ip-footer { font-size: 10px; color: rgba(255,255,255,0.2); margin-top: 20px; letter-spacing: 2px; text-align: center; }
-
-        /* Leyenda */
-        #legend { bottom: 24px; left: 24px; transition-delay: 0.5s; }
-        .legend-title { font-size: 16px; letter-spacing: 3px; color: rgba(255,255,255,0.8); margin-bottom: 8px; }
-        .legend-bar { width: 160px; height: 4px; border-radius: 2px; box-shadow: 0 0 6px rgba(255,255,255,0.8); background: linear-gradient(to right, #ff6600, #ffaa44, #ffe566, #ffffff, #aaddff); }
-        .legend-labels { display: flex; justify-content: space-between; font-size: 16px; letter-spacing: 1px; color: rgba(255,255,255,0.8); margin-top: 4px; }
-        .legend-grial { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 16px; letter-spacing: 2px; color: rgba(255,255,255,0.8); }
-        .grial-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 8px var(--gold); }
-        .ia-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
-        .exo-dot { width: 8px; height: 8px; border-radius: 50%; background: #e67e22; box-shadow: 0 0 8px #e67e22; }
-        .inh-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.4); }
-
-        /* Controles y Webcam */
-        #controls-hint { top: 24px; right: 24px; font-size: 13px; letter-spacing: 2px; color: rgba(255,255,255,0.8); text-align: right; line-height: 2.2; transition-delay: 0.7s; }
-        
-        #webcam-container {
-            bottom: 24px; right: 24px; width: 180px; height: 135px;
-            border: 1px solid var(--border); border-radius: 8px; overflow: hidden; z-index: 10;
-        }
-        #webcam { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); background: #000; }
-        #ai-status { position: absolute; bottom: 5px; left: 5px; right: 5px; font-size: 10px; text-align: center; background: rgba(0,0,0,0.8); padding: 4px; border-radius: 4px; transition: color 0.3s; }
-
-        /* PUNTERO VISUAL */
-        #hand-cursor {
-            position: fixed; width: 24px; height: 24px;
-            border: 2px solid rgba(255,255,255,0.5); border-radius: 50%;
-            pointer-events: none; z-index: 999; display: none;
-            transform: translate(-50%, -50%); transition: background 0.2s, border-color 0.2s, transform 0.1s;
-        }
-        #hand-cursor::after { content: ''; position: absolute; top: 50%; left: 50%; width: 4px; height: 4px; background: white; border-radius: 50%; transform: translate(-50%, -50%); }
-        #hand-cursor.pointing { border-color: var(--cyan); background: rgba(0, 212, 255, 0.1); }
-        #hand-cursor.pinching { border-color: var(--gold); background: rgba(241, 196, 15, 0.4); transform: translate(-50%, -50%) scale(0.7); }
-
-        /* TOOLTIP (Cartelito flotante) */
-        #tooltip { 
-            position: fixed; 
-            background: rgba(0, 0, 0, 0.9); 
-            border: 1px solid rgba(255, 255, 255, 0.1); 
-            border-left: 4px solid var(--gold);
-            padding: 16px 20px; 
-            font-size: 14px; 
-            line-height: 1.5;
-            letter-spacing: 1.5px; 
-            color: rgba(255, 255, 255, 0.9); 
-            pointer-events: none; 
-            display: none; 
-            white-space: nowrap; 
-            backdrop-filter: blur(6px); 
-            z-index: 200; 
-            box-shadow: 0 8px 24px rgba(0,0,0,0.8);
-        }
-        #tooltip .t-name { color: var(--gold); font-size: 18px; font-weight: bold; margin-bottom: 6px; }
-        
-        @keyframes decodeText {
-            0% { opacity: 0; transform: translateX(-5px); }
-            100% { opacity: 1; transform: translateX(0); }
-        }
-        #tooltip > div {
-            animation: decodeText 0.15s ease-out forwards;
-        }
-
-        /* --- EFECTOS DE POST-PROCESADO CSS --- */
-        #scanlines { position: fixed; inset: 0; pointer-events: none; z-index: 50; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px); }
-        #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 49; background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.5) 100%); }
-    </style>
+    }
+    </script>
 </head>
 
 <body>
-    <div id="scanlines"></div><div id="vignette"></div>
+    <div id="scanlines"></div>
+    <div id="vignette"></div>
 
+    <!-- Pantalla de carga -->
     <div id="overlay">
         <div class="logo"><span>ASTRO</span>NOMUS</div>
         <div class="tagline">Catálogo de Exoplanetas · Proyecto UADE</div>
@@ -147,638 +34,71 @@
         <div class="progress-track"><div class="progress-fill" id="prog"></div></div>
     </div>
 
+    <!-- HUD superior izquierdo -->
     <div id="hud">
         <div class="hud-title">EXOPLANET CATALOG</div>
-        <div class="hud-row">TOTAL <span class="val" id="h-total">—</span></div>
+        <div class="hud-row">TOTAL <span class="val"   id="h-total">—</span></div>
         <div class="hud-divider"></div>
-        <div class="hud-row">♦ HALLAZGOS IA <span class="ia" id="h-ia-candidates">—</span></div>
-        <div class="hud-row">★ GRIALES PHL <span class="grial" id="h-griales">—</span></div>
-        <div class="hud-row">● EXÓTICOS <span class="exo" id="h-exoticos">—</span></div>
-        <div class="hud-row">○ INHÓSPITOS <span class="inh" id="h-inhospitos">—</span></div>
-        
+        <div class="hud-row">♦ HALLAZGOS IA <span class="ia"    id="h-ia-candidates">—</span></div>
+        <div class="hud-row">★ GRIALES PHL  <span class="grial" id="h-griales">—</span></div>
+        <div class="hud-row">● EXÓTICOS     <span class="exo"   id="h-exoticos">—</span></div>
+        <div class="hud-row">○ INHÓSPITOS   <span class="inh"   id="h-inhospitos">—</span></div>
         <div id="target-panel">
             <div class="target-title">OBJETIVO ENLAZADO</div>
             <div id="t-selected-name">N/A</div>
         </div>
     </div>
 
+    <!-- Panel de detalle (derecha) -->
     <div id="info-panel">
         <div id="ip-type" class="ip-type"></div>
         <div id="ip-name" class="ip-name"></div>
         <div class="ip-stats">
             <span id="ip-teff"></span> • <span id="ip-rade"></span>
         </div>
-        <div class="hud-divider" style="width: 100%; margin: 15px 0 5px 0;"></div>
+        <div class="hud-divider" style="width:100%; margin:15px 0 5px 0;"></div>
         <div id="ip-desc" class="ip-desc"></div>
         <div class="ip-footer">SISTEMA ASTRONOMUS — DATOS TELEMÉTRICOS</div>
     </div>
 
+    <!-- Leyenda térmica -->
     <div id="legend">
         <div class="legend-title">TEMPERATURA Y CLASIFICACIÓN</div>
         <div class="legend-bar"></div>
         <div class="legend-labels"><span>2500K</span><span>M · K · G · F · A</span><span>10000K</span></div>
-        
         <div class="legend-grial"><div class="ia-dot"></div><span>CLASE 3: HALLAZGO IA (Alto IHP)</span></div>
         <div class="legend-grial"><div class="grial-dot"></div><span>CLASE 2: GRIAL (Tierra 2.0 PHL)</span></div>
         <div class="legend-grial"><div class="exo-dot"></div><span>CLASE 1: EXÓTICO (Mundo Extremo)</span></div>
         <div class="legend-grial"><div class="inh-dot"></div><span>CLASE 0: INHÓSPITO (Gas/Lava/Hielo)</span></div>
     </div>
 
+    <!-- Controles gestuales -->
     <div id="controls-hint">
-        <span style="color: rgba(255,255,255,0.5);">PUÑO CERRADO</span> · ROTAR 3D<br>
-        <span style="color: var(--cyan);">MANO 1: ÍNDICE</span> · APUNTAR<br>
-        <span style="color: var(--gold);">MANO 2: PELLIZCAR (🤏)</span> · SELECCIONAR<br>
-        <br>
-        <span style="color: #fff;">2 MANOS ABIERTAS + SEPARAR</span> · ZOOM ESPACIAL
+        <span style="color:rgba(255,255,255,0.5);">PUÑO CERRADO</span> · ROTAR 3D<br>
+        <span style="color:var(--cyan);">ÍNDICE EXTENDIDO</span> · APUNTAR<br>
+        <span style="color:var(--gold);">PULGAR + MEDIO</span> · SELECCIONAR (1 mano)<br>
+        <span style="color:var(--gold);">PULGAR + ÍNDICE (2ª mano)</span> · SELECCIONAR<br>
+        <span style="color:#fff;">2 MANOS ABIERTAS + SEPARAR</span> · ZOOM
     </div>
 
+    <!-- Webcam para hand tracking -->
     <div id="webcam-container">
         <video id="webcam" autoplay playsinline muted></video>
         <div id="ai-status">Iniciando IA...</div>
     </div>
 
+    <!-- Puntero virtual de mano -->
     <div id="hand-cursor"></div>
 
+    <!-- Tooltip flotante -->
     <div id="tooltip">
         <div class="t-name" id="tt-name"></div>
         <div id="tt-teff"></div>
         <div id="tt-rade"></div>
-        <div id="tt-ihp" style="color: var(--cyan); margin-top: 2px;"></div>
-        <div id="tt-grial" style="margin-top: 4px; letter-spacing: 2px; font-size: 9px;"></div>
+        <div id="tt-ihp"   style="color:var(--cyan); margin-top:2px;"></div>
+        <div id="tt-grial" style="margin-top:4px; letter-spacing:2px; font-size:9px;"></div>
     </div>
 
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three@0.162.0/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.162.0/examples/jsm/"
-        }
-    }
-    </script>
-
-    <script type="module">
-        import * as THREE from 'three';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-
-        const API_URL = window.location.protocol === 'file:' ? 'http://localhost:8000/api/exoplanets' : '/api/exoplanets';
-
-
-        const disposables = [];
-        let animFrameId = null;
-        let cameraUtilsRef = null;
-        let handsRef = null;
-
-        function cleanupWebGL() {
-            disposables.forEach(obj => obj.dispose());
-            disposables.length = 0;
-            if (pointsRef) { spaceGroup.remove(pointsRef); pointsRef = null; }
-            if (grialPointsRef) { spaceGroup.remove(grialPointsRef); grialPointsRef = null; }
-        }
-
-        function cleanupAll() {
-            cancelAnimationFrame(animFrameId);
-            if (cameraUtilsRef) cameraUtilsRef.stop();
-            if (handsRef) handsRef.close();
-            cleanupWebGL();
-            renderer.dispose();
-        }
-
-        window.addEventListener('beforeunload', cleanupAll);
-
-        // ==========================================
-        // GESTIÓN DE CICLO DE VIDA DE RECURSOS
-        // ==========================================
-        // Registra objetos WebGL para dispose ordenado (geometrías, materiales, texturas)
-        const disposables = [];
-        let animFrameId = null;
-        let cameraUtilsRef = null;
-        let handsRef = null;
-
-        function cleanupWebGL() {
-            disposables.forEach(obj => { try { obj.dispose(); } catch (_) {} });
-            disposables.length = 0;
-            spaceGroup?.clear();
-        }
-
-        function cleanupAll() {
-            try { cameraUtilsRef?.stop(); } catch (_) {}
-            try { handsRef?.close(); } catch (_) {}
-            cleanupWebGL();
-        }
-
-        window.addEventListener('beforeunload', cleanupAll);
-
-        // ==========================================
-        // 1. MOTOR GRÁFICO (Three.js Setup)
-        // ==========================================
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-        renderer.setSize(innerWidth, innerHeight);
-        renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-        document.body.appendChild(renderer.domElement);
-
-        // Recuperación ante pérdida de contexto WebGL (crash de driver, cambio de pestaña en móvil)
-        renderer.domElement.addEventListener('webglcontextlost', (e) => {
-            e.preventDefault();
-            cancelAnimationFrame(animFrameId);
-        });
-        renderer.domElement.addEventListener('webglcontextrestored', () => {
-            animate();
-        });
-
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 2000);
-        camera.position.set(0, 40, 220);
-
-        scene.add(new THREE.Mesh(
-            new THREE.SphereGeometry(200, 100, 100),
-            new THREE.MeshBasicMaterial({ color: 0x0a0a14, wireframe: true, transparent: true, opacity: 0.07 })
-        ));
-
-        const spaceGroup = new THREE.Group();
-        scene.add(spaceGroup);
-
-        const stardustCount = 3000;
-        const stardustPos = new Float32Array(stardustCount * 3);
-        for(let i=0; i < stardustCount * 3; i++) {
-            stardustPos[i] = (Math.random() - 0.5) * 800;
-        }
-        const stardustGeo = new THREE.BufferGeometry();
-        stardustGeo.setAttribute('position', new THREE.BufferAttribute(stardustPos, 3));
-        const stardustMat = new THREE.PointsMaterial({ color: 0x444455, size: 0.3, transparent: true, opacity: 0.4 });
-        const stardust = new THREE.Points(stardustGeo, stardustMat);
-        spaceGroup.add(stardust); // Añadido al spaceGroup para rotar en conjunto
-
-        // --- POST-PROCESADO (BLOOM) ---
-        const renderScene = new RenderPass(scene, camera);
-        const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.5, 0.4, 0.85);
-
-        bloomPass.threshold = 0.5;  // Antes 0.1
-        bloomPass.strength = 0.7;   // Antes 1.8
-        bloomPass.radius = 0.15;    // Antes 0.5
-
-        const composer = new EffectComposer(renderer);
-        composer.addPass(renderScene);
-        composer.addPass(bloomPass);
-
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true; controls.dampingFactor = 0.05;
-        controls.minDistance = 15; controls.maxDistance = 700;
-        let autoRotate = true; let autoRotateY = 0;
-        controls.addEventListener('start', () => { autoRotate = false; });
-
-        // --- RETÍCULA DE SELECCIÓN ---
-        const reticleGeo = new THREE.RingGeometry(1.5, 1.8, 32);
-        const reticleMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0, side: THREE.DoubleSide });
-        const reticle = new THREE.Mesh(reticleGeo, reticleMat);
-        scene.add(reticle);
-
-        function tempToRGB(teff) {
-            const t = Math.max(2500, Math.min(10000, teff || 5778));
-            let r, g, b;
-            if (t < 3700) { r=1; g=0.3+(t-2500)/4167; b=0; }
-            else if (t < 5200) { r=1; g=0.6+(t-3700)/7500; b=0.05; }
-            else if (t < 6000) { r=1; g=0.9+(t-5200)/8000; b=0.4+(t-5200)/2000; }
-            else if (t < 7500) { r=1; g=1; b=0.65+(t-6000)/4286; }
-            else { r=0.75+(10000-t)/10000; g=0.88; b=1; }
-            return [Math.min(1,r), Math.min(1,g), Math.min(1,b)];
-        }
-
-        function createStarTexture() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 64; canvas.height = 64;
-            const ctx = canvas.getContext('2d');
-
-            const cx = 32, cy = 32, spikes = 5, outerRadius = 30, innerRadius = 12;
-
-            ctx.beginPath();
-            let rot = Math.PI / 2 * 3;
-            let x = cx, y = cy;
-            let step = Math.PI / spikes;
-
-            ctx.moveTo(cx, cy - outerRadius);
-            for (let i = 0; i < spikes; i++) {
-                x = cx + Math.cos(rot) * outerRadius; y = cy + Math.sin(rot) * outerRadius; ctx.lineTo(x, y); rot += step;
-                x = cx + Math.cos(rot) * innerRadius; y = cy + Math.sin(rot) * innerRadius; ctx.lineTo(x, y); rot += step;
-            }
-            ctx.lineTo(cx, cy - outerRadius); ctx.closePath();
-
-            const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, outerRadius);
-            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-            gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.9)');
-            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            
-            ctx.fillStyle = gradient; ctx.fill();
-            return new THREE.CanvasTexture(canvas);
-        }
-
-        // ==========================================
-        // 2. GESTIÓN DE DATOS Y RENDERIZADO
-        // ==========================================
-        const raycaster = new THREE.Raycaster(); raycaster.params.Points.threshold = 1.2;
-        const virtualPointer = new THREE.Vector2(-999, -999);
-        let pointsRef = null, grialPointsRef = null, iaPointsRef = null;
-        let catalog = { names: [], temps: [], radii: [], targets: [], ihps: [] };
-        let hoveredStarIndex = null; 
-
-        async function loadCatalog() {
-            const setStatus = (msg, pct) => { document.getElementById('status-msg').textContent = msg; document.getElementById('prog').style.width = pct + '%'; };
-            setStatus('Conectando con la API...', 10);
-
-            // Limpiar objetos WebGL de una carga anterior antes de crear nuevos
-            cleanupWebGL();
-
-            const starTexture = createStarTexture();
-            disposables.push(starTexture);
-
-            // Fetch con timeout de 20 s para no bloquear la inicialización indefinidamente
-            const fetchController = new AbortController();
-            const fetchTimeout = setTimeout(() => fetchController.abort(), 20000);
-
-            try {
-                let res;
-                try {
-                    res = await fetch(API_URL, { signal: fetchController.signal });
-                    clearTimeout(fetchTimeout);
-                } catch {
-                    clearTimeout(fetchTimeout);
-                    res = { ok: true, json: async () => ({
-                        meta: { total: 1000, labeled: 100, griales: 5 },
-                        positions: Array.from({length: 3000}, () => (Math.random()-0.5)*10000),
-                        temperatures: Array.from({length: 1000}, () => Math.random()*8000 + 2000),
-                        radii: Array.from({length: 1000}, () => Math.random()*5),
-                        target_classes: Array.from({length: 1000}, () => Math.random() > 0.95 ? 2 : 0),
-                        names: Array.from({length: 1000}, (_,i) => `Kepler-${i}`)
-                    })};
-                }
-                
-                const data = await res.json();
-
-                catalog = { 
-                    names: data.names, 
-                    temps: data.temperatures, 
-                    radii: data.radii, 
-                    targets: data.target_classes, 
-                    ihps: data.ihp,
-                    score_ia: data.score_ia,        
-                    score_heller: data.score_heller 
-                };
-                
-                setStatus(`Procesando ${data.meta.total} cuerpos celestes...`, 70);
-                await new Promise(r => setTimeout(r, 50)); 
-
-                const normIdx = [], grialIdx = [], iaIdx = [];
-                data.target_classes.forEach((tc, i) => {
-                    if (tc === 2) grialIdx.push(i);
-                    else if (tc === 3) iaIdx.push(i);
-                    else normIdx.push(i);
-                });
-
-                const jitter = () => (Math.random() - 0.5) * 3.5;
-
-                const normPos = new Float32Array(normIdx.length * 3);
-                const normCol = new Float32Array(normIdx.length * 3);
-                normIdx.forEach((src, dst) => {
-                    normPos[dst*3] = data.positions[src*3] + jitter();
-                    normPos[dst*3+1] = data.positions[src*3+1] + jitter();
-                    normPos[dst*3+2] = data.positions[src*3+2] + jitter();
-                    const [r, g, b] = tempToRGB(data.temperatures[src]);
-                    normCol[dst*3] = r;
-                    normCol[dst*3+1] = g; normCol[dst*3+2] = b;
-                });
-
-                const normGeo = new THREE.BufferGeometry();
-                normGeo.setAttribute('position', new THREE.BufferAttribute(normPos, 3));
-                normGeo.setAttribute('color', new THREE.BufferAttribute(normCol, 3));
-                const normMat = new THREE.PointsMaterial({
-                    vertexColors: true, size: 2.5, sizeAttenuation: true,
-                    transparent: true, opacity: 0.50, map: starTexture,
-                    alphaTest: 0.05, depthWrite: false
-                });
-                pointsRef = new THREE.Points(normGeo, normMat);
-                pointsRef.userData.indexMap = normIdx;
-                spaceGroup.add(pointsRef);
-                disposables.push(normGeo, normMat);
-
-                if (grialIdx.length > 0) {
-                    const gPos = new Float32Array(grialIdx.length * 3);
-                    grialIdx.forEach((src, dst) => { gPos[dst*3] = data.positions[src*3]; gPos[dst*3+1] = data.positions[src*3+1]; gPos[dst*3+2] = data.positions[src*3+2]; });
-                    const gGeo = new THREE.BufferGeometry(); gGeo.setAttribute('position', new THREE.BufferAttribute(gPos, 3));
-                    const gMat = new THREE.PointsMaterial({ color: 0xf1c40f, size: 9.0, sizeAttenuation: true, transparent: true, map: starTexture, alphaTest: 0.05, depthWrite: false });
-                    grialPointsRef = new THREE.Points(gGeo, gMat);
-                    grialPointsRef.userData.indexMap = grialIdx;
-                    spaceGroup.add(grialPointsRef);
-                    const glowGrialMat = new THREE.PointsMaterial({ color: 0xf39c12, size: 11.0, sizeAttenuation: true, transparent: true, opacity: 0.18 });
-                    spaceGroup.add(new THREE.Points(gGeo, glowGrialMat));
-                    disposables.push(gGeo, gMat, glowGrialMat);
-                }
-
-                if (iaIdx.length > 0) {
-                    const iaPos = new Float32Array(iaIdx.length * 3);
-                    iaIdx.forEach((src, dst) => { iaPos[dst*3] = data.positions[src*3]; iaPos[dst*3+1] = data.positions[src*3+1]; iaPos[dst*3+2] = data.positions[src*3+2]; });
-                    const iaGeo = new THREE.BufferGeometry(); iaGeo.setAttribute('position', new THREE.BufferAttribute(iaPos, 3));
-                    const iaMat = new THREE.PointsMaterial({ color: 0x00d4ff, size: 4.5, sizeAttenuation: true });
-                    iaPointsRef = new THREE.Points(iaGeo, iaMat);
-                    iaPointsRef.userData.indexMap = iaIdx;
-                    spaceGroup.add(iaPointsRef);
-                    const glowIaMat = new THREE.PointsMaterial({ color: 0x00d4ff, size: 9.0, sizeAttenuation: true, transparent: true, opacity: 0.15 });
-                    spaceGroup.add(new THREE.Points(iaGeo, glowIaMat));
-                    disposables.push(iaGeo, iaMat, glowIaMat);
-                }
-
-                document.getElementById('h-total').textContent = data.meta.total.toLocaleString('es-AR') + ' EXOPLANETAS';
-                document.getElementById('h-ia-candidates').textContent = (data.meta.ia_candidates || 0) + ' DETECTADOS';
-                document.getElementById('h-griales').textContent = (data.meta.griales || 0) + ' CONFIRMADOS';
-                document.getElementById('h-exoticos').textContent = (data.meta.exoticos || 0) + ' REGISTRADOS';
-                document.getElementById('h-inhospitos').textContent = (data.meta.inhospitos || 0) + ' DESCARTADOS';
-
-                setStatus('Catálogo inicializado', 100);
-                setTimeout(() => { 
-                    document.getElementById('overlay').classList.add('fade-out'); 
-                    ['hud', 'legend', 'controls-hint', 'webcam-container'].forEach(id => document.getElementById(id).classList.add('show'));
-                }, 500);
-
-            } catch (error) { setStatus('ERROR CRÍTICO: No se pudo cargar el catálogo.', 0); }
-        }
-
-        // ==========================================
-        // 3. IA DE MANOS MULTITAREA Y ZOOM
-        // ==========================================
-        let targetRotationX = 0; let targetRotationY = 0;
-        let isGrabbingSpace = false; let wasPinching = false; let lastZoomDist = 0;
-        let smoothTargetX = window.innerWidth / 2; let smoothTargetY = window.innerHeight / 2;
-
-        const handCursor = document.getElementById('hand-cursor');
-        const tooltip = document.getElementById('tooltip');
-
-        function initWebcamAndAI() {
-            const videoElement = document.getElementById("webcam");
-            const statusText = document.getElementById("ai-status");
-
-            if (!window.Hands || !window.Camera) { statusText.textContent = "Error de IA"; return; }
-
-            handsRef = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
-            const hands = handsRef;
-            hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
-
-            handsRef.onResults((results) => {
-                isGrabbingSpace = false; handCursor.style.display = 'none'; virtualPointer.x = -999; 
-                
-                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                    autoRotate = false; 
-
-                    const parsedHands = results.multiHandLandmarks.map(hand => {
-                        const wrist = hand[0];
-                        const thumbTip = hand[4], thumbIP = hand[3];
-                        const indexPip = hand[6], indexTip = hand[8];
-                        const middlePip = hand[10], middleTip = hand[12], middleBase = hand[9];
-                        const ringPip = hand[14], ringTip = hand[16];
-                        const pinkyPip = hand[18], pinkyTip = hand[20];
-
-                        const palmCenterX = (wrist.x + middleBase.x) * 0.5;
-                        const palmCenterY = (wrist.y + middleBase.y) * 0.5;
-
-                        const thumbCurled = Math.hypot(thumbTip.x - palmCenterX, thumbTip.y - palmCenterY) < Math.hypot(thumbIP.x - palmCenterX, thumbIP.y - palmCenterY) * 1.1;
-                        const indexCurled = Math.hypot(indexTip.x - wrist.x, indexTip.y - wrist.y) < Math.hypot(indexPip.x - wrist.x, indexPip.y - wrist.y) * 1.08;
-                        const middleCurled = Math.hypot(middleTip.x - wrist.x, middleTip.y - wrist.y) < Math.hypot(middlePip.x - wrist.x, middlePip.y - wrist.y) * 1.08;
-                        const ringCurled = Math.hypot(ringTip.x - wrist.x, ringTip.y - wrist.y) < Math.hypot(ringPip.x - wrist.x, ringPip.y - wrist.y) * 1.08;
-                        const pinkyCurled = Math.hypot(pinkyTip.x - wrist.x, pinkyTip.y - wrist.y) < Math.hypot(pinkyPip.x - wrist.x, pinkyPip.y - wrist.y) * 1.12;
-                        
-                        const curledCount = [indexCurled, middleCurled, ringCurled, pinkyCurled].filter(Boolean).length;
-
-                        const palmSize = Math.hypot(wrist.x - middleBase.x, wrist.y - middleBase.y);
-                        const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
-                        const indexToPalm = Math.hypot(indexTip.x - middleBase.x, indexTip.y - middleBase.y);
-
-                        const isPinching = (pinchDist < palmSize * 0.4) && (indexToPalm > palmSize * 0.6);
-                        const isPointing = !indexCurled && middleCurled && ringCurled && !isPinching;
-                        const isGrabbing = indexCurled && middleCurled && ringCurled && !isPinching;
-                        
-                        return {
-                            hand, wrist, indexTip, middleBase,
-                            isGrabbing: isGrabbing,
-                            isPointing: isPointing,
-                            isPinching: isPinching,
-                            isOpen: !thumbCurled && curledCount === 0
-                        };
-                    });
-
-                    if (parsedHands.length === 2 && parsedHands[0].isOpen && parsedHands[1].isOpen) {
-                        statusText.style.color = "var(--gold)"; statusText.textContent = "Escalando (Zoom)";
-                        const dist = Math.hypot(parsedHands[0].wrist.x - parsedHands[1].wrist.x, parsedHands[0].wrist.y - parsedHands[1].wrist.y);
-                        
-                        if (lastZoomDist > 0) {
-                            const delta = dist - lastZoomDist;
-                            let currentRadius = camera.position.length();
-                            currentRadius -= delta * 250; 
-                            currentRadius = Math.max(controls.minDistance, Math.min(controls.maxDistance, currentRadius));
-                            camera.position.setLength(currentRadius);
-                        }
-                        lastZoomDist = dist; wasPinching = false; 
-
-                    } else {
-                        lastZoomDist = 0;
-                        
-                        const pointer = parsedHands.find(h => h.isPointing);
-                        const pincher = parsedHands.find(h => h.isPinching);
-                        const grabber = parsedHands.find(h => h.isGrabbing);
-
-                        if (grabber) {
-                            isGrabbingSpace = true;
-                            const h = grabber;
-                            const handCenterX = (h.wrist.x + h.middleBase.x + h.hand[5].x + h.hand[17].x) * 0.25;
-                            const handCenterY = (h.wrist.y + h.middleBase.y + h.hand[5].y + h.hand[17].y) * 0.25;
-                            targetRotationY = -(handCenterX - 0.5) * Math.PI * 1.0;
-                            targetRotationX = (handCenterY - 0.5) * Math.PI * 1.0;
-                        } else {
-                            targetRotationY = spaceGroup.rotation.y; targetRotationX = spaceGroup.rotation.x;
-                        }
-
-                        if (pointer) {
-                            const screenX = (1 - pointer.indexTip.x) * window.innerWidth;
-                            const screenY = pointer.indexTip.y * window.innerHeight;
-
-                            smoothTargetX += (screenX - smoothTargetX) * 0.15;
-                            smoothTargetY += (screenY - smoothTargetY) * 0.15;
-
-                            handCursor.style.display = 'block';
-                            handCursor.style.left = `${smoothTargetX}px`; handCursor.style.top = `${smoothTargetY}px`;
-                            
-                            virtualPointer.x = (smoothTargetX / window.innerWidth) * 2 - 1;
-                            virtualPointer.y = -(smoothTargetY / window.innerHeight) * 2 + 1;
-                            tooltip.style.left = `${smoothTargetX + 24}px`; tooltip.style.top = `${smoothTargetY - 16}px`;
-
-                            if (pincher) {
-                                handCursor.className = 'pinching';
-                                if (!wasPinching) seleccionarEstrella();
-                                wasPinching = true;
-                            } else { 
-                                handCursor.className = 'pointing'; 
-                                wasPinching = false; 
-                            }
-                        } else { 
-                            wasPinching = false; 
-                        }
-                        
-                        if (pointer && pincher) {
-                            statusText.style.color = "var(--gold)"; statusText.textContent = "Apuntando y Clic (2 Manos)";
-                        } else if (grabber && pointer) {
-                            statusText.style.color = "var(--cyan)"; statusText.textContent = "Rotando y Apuntando";
-                        } else if (grabber) {
-                            statusText.style.color = "white"; statusText.textContent = "Rotando espacio";
-                        } else if (pointer) {
-                            statusText.style.color = "var(--cyan)"; statusText.textContent = "Apuntando (Esperando clic...)";
-                        } else if (pincher) {
-                            statusText.style.color = "gray"; statusText.textContent = "Falta mano para apuntar";
-                        } else {
-                            statusText.style.color = "gray"; statusText.textContent = parsedHands.length === 2 ? "2 Manos detectadas" : "1 Mano detectada";
-                        }
-                    }
-
-                } else {
-                    lastZoomDist = 0; wasPinching = false;
-                    statusText.style.color = "gray"; statusText.textContent = "Buscando manos...";
-                    targetRotationY = spaceGroup.rotation.y; targetRotationX = spaceGroup.rotation.x;
-                }
-            });
-
-            cameraUtilsRef = new Camera(videoElement, { onFrame: async () => { await hands.send({ image: videoElement }); }, width: 320, height: 240 });
-            cameraUtilsRef.start().then(() => { statusText.textContent = "Sistema IA Listo"; });
-        }
-
-        // ==========================================
-        // 4. BUCLE DE INTERACCIÓN Y RENDER
-        // ==========================================
-        window.addEventListener('mousemove', (e) => {
-            if (!document.getElementById('hand-cursor').classList.contains('pointing')) {
-                virtualPointer.x = (e.clientX / innerWidth) * 2 - 1; 
-                virtualPointer.y = -(e.clientY / innerHeight) * 2 + 1;
-                tooltip.style.left = `${e.clientX + 24}px`; 
-                tooltip.style.top = `${e.clientY - 16}px`;
-            }
-        });
-        
-        window.addEventListener('click', () => { if (virtualPointer.x !== -999) seleccionarEstrella(); });
-
-        function seleccionarEstrella() {
-            if (hoveredStarIndex !== null) {
-                const nombre = catalog.names[hoveredStarIndex] || 'Desconocido';
-                const teff = Math.round(catalog.temps[hoveredStarIndex] || 0);
-                const radio = (catalog.radii[hoveredStarIndex] || 0).toFixed(2);
-                const tc = catalog.targets[hoveredStarIndex];
-
-                document.getElementById('target-panel').style.display = 'block';
-                document.getElementById('t-selected-name').textContent = nombre;
-
-                const typeText = tc === 3 ? '♦ Hallazgo IA' : tc === 2 ? '★ Tierra 2.0 (Habitable)' : tc === 1 ? 'Mundo Exótico' : tc === 0 ? 'Mundo Inhóspito' : 'Desconocido';
-                const typeColor = tc === 3 ? 'var(--cyan)' : tc === 2 ? 'var(--gold)' : tc === 1 ? '#e67e22' : 'rgba(255,255,255,0.5)';
-
-                let desc = `Este sistema exoplanetario orbita una estrella principal con una temperatura superficial de ${teff}K. `;
-                if (tc === 3) desc += `Ha sido etiquetado por nuestra IA debido a su alto IHP. Requiere confirmación telemétrica pero presenta características atmosféricas prometedoras.`;
-                else if (tc === 2) desc += `Con un radio estimado de ${radio} masas terrestres y orbitando en la zona de habitabilidad de su sistema, es un fuerte candidato para albergar agua líquida y condiciones favorables para la vida tal como la conocemos.`;
-                else if (tc === 1) desc += `Sus características anómalas y su tamaño de ${radio} R⊕ lo categorizan como un mundo exótico, sugiriendo una composición química inusual o densas capas atmosféricas.`;
-                else desc += `Debido a la radiación estelar y su radio de ${radio} R⊕, las condiciones son extremadamente hostiles. Probablemente se trate de un gigante gaseoso abrasador o una roca estéril sin atmósfera.`;
-
-                const infoPanel = document.getElementById('info-panel');
-                
-                const ipType = document.getElementById('ip-type');
-                ipType.textContent = typeText;
-                ipType.style.color = typeColor;
-                
-                document.getElementById('ip-name').textContent = nombre;
-                document.getElementById('ip-teff').textContent = `TEMP ESTELAR: ${teff} K`;
-                document.getElementById('ip-rade').textContent = `RADIO PLANETARIO: ${radio} R⊕`;
-                document.getElementById('ip-desc').textContent = desc;
-                
-                infoPanel.style.borderLeftColor = typeColor;
-                infoPanel.style.display = 'flex';
-            } else {
-                document.getElementById('target-panel').style.display = 'none';
-                document.getElementById('info-panel').style.display = 'none';
-            }
-        }
-
-        function renderHover() {
-            const targets = [];
-            if (pointsRef) targets.push(pointsRef);
-            if (grialPointsRef) targets.push(grialPointsRef);
-            if (iaPointsRef) targets.push(iaPointsRef);
-
-            if (targets.length === 0 || virtualPointer.x === -999) { 
-                tooltip.style.display = 'none'; 
-                hoveredStarIndex = null; 
-                reticle.material.opacity = 0;
-                return; 
-            }
-            
-            raycaster.setFromCamera(virtualPointer, camera);
-            const intersects = raycaster.intersectObjects(targets);
-
-            if (intersects.length > 0) {
-                const hit = intersects[0];
-                hoveredStarIndex = hit.object.userData.indexMap[hit.index];
-                const tc = catalog.targets[hoveredStarIndex];
-
-                document.getElementById('tt-name').textContent = catalog.names[hoveredStarIndex] || '—';
-                document.getElementById('tt-teff').textContent = `Estrella: ${Math.round(catalog.temps[hoveredStarIndex] || 0)} K`;
-                document.getElementById('tt-rade').textContent = `Radio: ${(catalog.radii[hoveredStarIndex] || 0).toFixed(2)} R⊕`;
-                
-                const ihpVal = catalog.ihps ? catalog.ihps[hoveredStarIndex] || 0 : 0;
-                const iaVal = catalog.score_ia ? catalog.score_ia[hoveredStarIndex] || 0 : 0;
-                const hellerVal = catalog.score_heller ? catalog.score_heller[hoveredStarIndex] || 0 : 0;
-                
-                const ttIhp = document.getElementById('tt-ihp');
-                if (tc === 3 || tc === 2) {
-                    ttIhp.style.display = 'block';
-                    ttIhp.innerHTML = `
-                            <div style="color:var(--cyan)">IHP TOTAL: ${ihpVal}%</div>
-                            <div style="font-size:8px; opacity:0.7; margin-top:2px; color: #fff;">
-                            IA: ${iaVal}% | Heller: ${hellerVal}%
-                            </div>
-                        `;
-                } else {
-                    ttIhp.style.display = 'none';
-                }
-                
-                const grialText = document.getElementById('tt-grial');
-                grialText.textContent = tc === 3 ? '♦ DESCUBRIMIENTO IA' : tc === 2 ? '★ TIERRA 2.0 (GRIAL)' : tc === 1 ? 'Mundo Exótico' : tc === 0 ? 'Mundo Inhóspito' : 'Desconocido';
-                grialText.style.color = tc === 3 ? 'var(--cyan)' : tc === 2 ? 'var(--gold)' : 'rgba(255,255,255,0.4)';
-
-                tooltip.style.display = 'block'; document.body.style.cursor = 'pointer';
-            } else {
-                reticle.material.opacity = 0;
-                tooltip.style.display = 'none'; document.body.style.cursor = 'crosshair';
-                hoveredStarIndex = null;
-            }
-        }
-
-        function animate() {
-            animFrameId = requestAnimationFrame(animate);
-            if (autoRotate) { autoRotateY += 0.00050; spaceGroup.rotation.y = autoRotateY; } 
-            else if (isGrabbingSpace) {
-                spaceGroup.rotation.y += (targetRotationY - spaceGroup.rotation.y) * 0.04;
-                spaceGroup.rotation.x += (targetRotationX - spaceGroup.rotation.x) * 0.04;
-            }
-
-            if (stardust) {
-                stardust.rotation.y -= 0.001;
-                stardust.rotation.x += 0.002;
-            }
-
-            renderHover(); controls.update(); 
-            composer.render(); // Se usa composer en lugar de renderer directo por el efecto Bloom
-        }
-
-        window.addEventListener('resize', () => { 
-            camera.aspect = innerWidth / innerHeight; 
-            camera.updateProjectionMatrix(); 
-            renderer.setSize(innerWidth, innerHeight); 
-            composer.setSize(innerWidth, innerHeight);
-        });
-        
-        loadCatalog(); initWebcamAndAI(); animate();
-    </script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>

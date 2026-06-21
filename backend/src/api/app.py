@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from .routers.exoplanets import router as exoplanets_router
 
@@ -43,6 +44,10 @@ app.include_router(exoplanets_router)
 # SERVIDOR DEL FRONTEND INTERACTIVO
 # ==========================================
 FRONTEND_DIR = Path("frontend")
+
+# Sirve los subdirectorios de assets generados por la refactorización del frontend
+app.mount("/css", StaticFiles(directory=FRONTEND_DIR / "css"), name="css")
+app.mount("/js",  StaticFiles(directory=FRONTEND_DIR / "js"),  name="js")
 
 @app.get("/", include_in_schema=False, response_model=None)
 def serve_viewer() -> FileResponse | JSONResponse:

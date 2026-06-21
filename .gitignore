@@ -4,6 +4,8 @@ backend/data/archive
 #backend/data/raw/*
 !backend/data/raw/.gitkeep
 
+docs
+
 backend/data/silver/*
 !backend/data/silver/.gitkeep
 
