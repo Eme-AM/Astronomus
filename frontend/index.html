@@ -8,8 +8,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@200;400&display=swap" rel="stylesheet">
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
@@ -40,10 +38,14 @@
         #hud.show, #legend.show, #controls-hint.show, #webcam-container.show { opacity: 1; }
         #hud { top: 24px; left: 24px; }
         .hud-title { font-family: var(--sans); font-weight: 200; font-size: 22px; letter-spacing: 6px; color: var(--gold); margin-bottom: 12px; }
-        .hud-row { display: flex; gap: 14px; align-items: baseline; font-size: 14px; letter-spacing: 2px; color: rgba(255,255,255,0.8); margin-bottom: 5px; }
-        .hud-row .val { color: rgba(255,255,255,0.8); font-size: 14px; }
-        .hud-row .grial { color: var(--gold); font-size: 14px; }
+        .hud-row { display: flex; gap: 14px; align-items: baseline; font-size: 16px; letter-spacing: 2px; color: rgba(255,255,255,0.8); margin-bottom: 5px; }
+        .hud-row .val { color: rgba(255,255,255,0.8); font-size: 16px; }
+        .hud-row .grial { color: var(--gold); font-size: 16px; }
+        .hud-row .ia { color: var(--cyan); font-size: 16px; text-shadow: 0 0 8px var(--cyan); }
         .hud-divider { width: 120px; height: 1px; background: var(--border); margin: 10px 0; }
+        
+        .hud-row .exo { color: #e67e22; font-size: 16px; text-shadow: 0 0 8px #e67e22; }
+        .hud-row .inh { color: rgba(255,255,255,0.6); font-size: 16px; }
 
         #target-panel { display: none; margin-top: 15px; padding: 10px; background: rgba(0, 212, 255, 0.1); border-left: 3px solid var(--cyan); }
         .target-title { font-size: 10px; color: rgba(255,255,255,0.5); letter-spacing: 2px; margin-bottom: 4px; }
@@ -76,6 +78,9 @@
         .legend-labels { display: flex; justify-content: space-between; font-size: 16px; letter-spacing: 1px; color: rgba(255,255,255,0.8); margin-top: 4px; }
         .legend-grial { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 16px; letter-spacing: 2px; color: rgba(255,255,255,0.8); }
         .grial-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+        .ia-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+        .exo-dot { width: 8px; height: 8px; border-radius: 50%; background: #e67e22; box-shadow: 0 0 8px #e67e22; }
+        .inh-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.4); }
 
         /* Controles y Webcam */
         #controls-hint { top: 24px; right: 24px; font-size: 13px; letter-spacing: 2px; color: rgba(255,255,255,0.8); text-align: right; line-height: 2.2; transition-delay: 0.7s; }
@@ -117,8 +122,16 @@
             box-shadow: 0 8px 24px rgba(0,0,0,0.8);
         }
         #tooltip .t-name { color: var(--gold); font-size: 18px; font-weight: bold; margin-bottom: 6px; }
-        #tt-grial { margin-top: 8px; letter-spacing: 2px; font-size: 12px; text-transform: uppercase; }
+        
+        @keyframes decodeText {
+            0% { opacity: 0; transform: translateX(-5px); }
+            100% { opacity: 1; transform: translateX(0); }
+        }
+        #tooltip > div {
+            animation: decodeText 0.15s ease-out forwards;
+        }
 
+        /* --- EFECTOS DE POST-PROCESADO CSS --- */
         #scanlines { position: fixed; inset: 0; pointer-events: none; z-index: 50; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px); }
         #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 49; background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.5) 100%); }
     </style>
@@ -137,9 +150,11 @@
     <div id="hud">
         <div class="hud-title">EXOPLANET CATALOG</div>
         <div class="hud-row">TOTAL <span class="val" id="h-total">—</span></div>
-        <div class="hud-row">ETIQUETADOS <span class="val" id="h-labeled">—</span></div>
         <div class="hud-divider"></div>
-        <div class="hud-row">★ TIERRA 2.0 <span class="grial" id="h-griales">—</span></div>
+        <div class="hud-row">♦ HALLAZGOS IA <span class="ia" id="h-ia-candidates">—</span></div>
+        <div class="hud-row">★ GRIALES PHL <span class="grial" id="h-griales">—</span></div>
+        <div class="hud-row">● EXÓTICOS <span class="exo" id="h-exoticos">—</span></div>
+        <div class="hud-row">○ INHÓSPITOS <span class="inh" id="h-inhospitos">—</span></div>
         
         <div id="target-panel">
             <div class="target-title">OBJETIVO ENLAZADO</div>
@@ -159,10 +174,14 @@
     </div>
 
     <div id="legend">
-        <div class="legend-title">TEMPERATURA ESTELAR</div>
+        <div class="legend-title">TEMPERATURA Y CLASIFICACIÓN</div>
         <div class="legend-bar"></div>
         <div class="legend-labels"><span>2500K</span><span>M · K · G · F · A</span><span>10000K</span></div>
-        <div class="legend-grial"><div class="grial-dot"></div><span>GRIAL — TIERRA 2.0</span></div>
+        
+        <div class="legend-grial"><div class="ia-dot"></div><span>CLASE 3: HALLAZGO IA (Alto IHP)</span></div>
+        <div class="legend-grial"><div class="grial-dot"></div><span>CLASE 2: GRIAL (Tierra 2.0 PHL)</span></div>
+        <div class="legend-grial"><div class="exo-dot"></div><span>CLASE 1: EXÓTICO (Mundo Extremo)</span></div>
+        <div class="legend-grial"><div class="inh-dot"></div><span>CLASE 0: INHÓSPITO (Gas/Lava/Hielo)</span></div>
     </div>
 
     <div id="controls-hint">
@@ -184,10 +203,26 @@
         <div class="t-name" id="tt-name"></div>
         <div id="tt-teff"></div>
         <div id="tt-rade"></div>
-        <div id="tt-grial"></div>
+        <div id="tt-ihp" style="color: var(--cyan); margin-top: 2px;"></div>
+        <div id="tt-grial" style="margin-top: 4px; letter-spacing: 2px; font-size: 9px;"></div>
     </div>
 
-    <script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.162.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.162.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
         const API_URL = window.location.protocol === 'file:' ? 'http://localhost:8000/api/exoplanets' : '/api/exoplanets';
 
 
@@ -214,6 +249,29 @@
         window.addEventListener('beforeunload', cleanupAll);
 
         // ==========================================
+        // GESTIÓN DE CICLO DE VIDA DE RECURSOS
+        // ==========================================
+        // Registra objetos WebGL para dispose ordenado (geometrías, materiales, texturas)
+        const disposables = [];
+        let animFrameId = null;
+        let cameraUtilsRef = null;
+        let handsRef = null;
+
+        function cleanupWebGL() {
+            disposables.forEach(obj => { try { obj.dispose(); } catch (_) {} });
+            disposables.length = 0;
+            spaceGroup?.clear();
+        }
+
+        function cleanupAll() {
+            try { cameraUtilsRef?.stop(); } catch (_) {}
+            try { handsRef?.close(); } catch (_) {}
+            cleanupWebGL();
+        }
+
+        window.addEventListener('beforeunload', cleanupAll);
+
+        // ==========================================
         // 1. MOTOR GRÁFICO (Three.js Setup)
         // ==========================================
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
@@ -221,29 +279,61 @@
         renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
         document.body.appendChild(renderer.domElement);
 
+        // Recuperación ante pérdida de contexto WebGL (crash de driver, cambio de pestaña en móvil)
         renderer.domElement.addEventListener('webglcontextlost', (e) => {
             e.preventDefault();
             cancelAnimationFrame(animFrameId);
         });
-        renderer.domElement.addEventListener('webglcontextrestored', () => { animate(); });
+        renderer.domElement.addEventListener('webglcontextrestored', () => {
+            animate();
+        });
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 2000);
         camera.position.set(0, 40, 220);
 
         scene.add(new THREE.Mesh(
-            new THREE.SphereGeometry(108, 36, 18),
+            new THREE.SphereGeometry(200, 100, 100),
             new THREE.MeshBasicMaterial({ color: 0x0a0a14, wireframe: true, transparent: true, opacity: 0.07 })
         ));
 
         const spaceGroup = new THREE.Group();
         scene.add(spaceGroup);
 
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        const stardustCount = 3000;
+        const stardustPos = new Float32Array(stardustCount * 3);
+        for(let i=0; i < stardustCount * 3; i++) {
+            stardustPos[i] = (Math.random() - 0.5) * 800;
+        }
+        const stardustGeo = new THREE.BufferGeometry();
+        stardustGeo.setAttribute('position', new THREE.BufferAttribute(stardustPos, 3));
+        const stardustMat = new THREE.PointsMaterial({ color: 0x444455, size: 0.3, transparent: true, opacity: 0.4 });
+        const stardust = new THREE.Points(stardustGeo, stardustMat);
+        spaceGroup.add(stardust); // Añadido al spaceGroup para rotar en conjunto
+
+        // --- POST-PROCESADO (BLOOM) ---
+        const renderScene = new RenderPass(scene, camera);
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.5, 0.4, 0.85);
+
+        bloomPass.threshold = 0.5;  // Antes 0.1
+        bloomPass.strength = 0.7;   // Antes 1.8
+        bloomPass.radius = 0.15;    // Antes 0.5
+
+        const composer = new EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true; controls.dampingFactor = 0.05;
         controls.minDistance = 15; controls.maxDistance = 700;
         let autoRotate = true; let autoRotateY = 0;
         controls.addEventListener('start', () => { autoRotate = false; });
+
+        // --- RETÍCULA DE SELECCIÓN ---
+        const reticleGeo = new THREE.RingGeometry(1.5, 1.8, 32);
+        const reticleMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0, side: THREE.DoubleSide });
+        const reticle = new THREE.Mesh(reticleGeo, reticleMat);
+        scene.add(reticle);
 
         function tempToRGB(teff) {
             const t = Math.max(2500, Math.min(10000, teff || 5778));
@@ -288,77 +378,121 @@
         // 2. GESTIÓN DE DATOS Y RENDERIZADO
         // ==========================================
         const raycaster = new THREE.Raycaster(); raycaster.params.Points.threshold = 1.2;
-        const virtualPointer = new THREE.Vector2(-999, -999); 
-        
-        let pointsRef = null, grialPointsRef = null;
-        let catalog = { names: [], temps: [], radii: [], targets: [] };
+        const virtualPointer = new THREE.Vector2(-999, -999);
+        let pointsRef = null, grialPointsRef = null, iaPointsRef = null;
+        let catalog = { names: [], temps: [], radii: [], targets: [], ihps: [] };
         let hoveredStarIndex = null; 
 
         async function loadCatalog() {
             const setStatus = (msg, pct) => { document.getElementById('status-msg').textContent = msg; document.getElementById('prog').style.width = pct + '%'; };
             setStatus('Conectando con la API...', 10);
 
+            // Limpiar objetos WebGL de una carga anterior antes de crear nuevos
             cleanupWebGL();
+
             const starTexture = createStarTexture();
             disposables.push(starTexture);
 
+            // Fetch con timeout de 20 s para no bloquear la inicialización indefinidamente
+            const fetchController = new AbortController();
+            const fetchTimeout = setTimeout(() => fetchController.abort(), 20000);
+
             try {
-                const res = await fetch(API_URL).catch(() => {
-                    return { ok: true, json: async () => ({
+                let res;
+                try {
+                    res = await fetch(API_URL, { signal: fetchController.signal });
+                    clearTimeout(fetchTimeout);
+                } catch {
+                    clearTimeout(fetchTimeout);
+                    res = { ok: true, json: async () => ({
                         meta: { total: 1000, labeled: 100, griales: 5 },
-                        positions: Array.from({length: 3000}, () => (Math.random()-0.5)*200),
+                        positions: Array.from({length: 3000}, () => (Math.random()-0.5)*10000),
                         temperatures: Array.from({length: 1000}, () => Math.random()*8000 + 2000),
                         radii: Array.from({length: 1000}, () => Math.random()*5),
                         target_classes: Array.from({length: 1000}, () => Math.random() > 0.95 ? 2 : 0),
                         names: Array.from({length: 1000}, (_,i) => `Kepler-${i}`)
                     })};
-                });
+                }
                 
                 const data = await res.json();
-                catalog = { names: data.names, temps: data.temperatures, radii: data.radii, targets: data.target_classes };
-                setStatus(`Procesando ${data.meta.total} cuerpos celestes...`, 70);
 
-                const normIdx = [], grialIdx = [];
-                data.target_classes.forEach((tc, i) => tc === 2 ? grialIdx.push(i) : normIdx.push(i));
+                catalog = { 
+                    names: data.names, 
+                    temps: data.temperatures, 
+                    radii: data.radii, 
+                    targets: data.target_classes, 
+                    ihps: data.ihp,
+                    score_ia: data.score_ia,        
+                    score_heller: data.score_heller 
+                };
+                
+                setStatus(`Procesando ${data.meta.total} cuerpos celestes...`, 70);
+                await new Promise(r => setTimeout(r, 50)); 
+
+                const normIdx = [], grialIdx = [], iaIdx = [];
+                data.target_classes.forEach((tc, i) => {
+                    if (tc === 2) grialIdx.push(i);
+                    else if (tc === 3) iaIdx.push(i);
+                    else normIdx.push(i);
+                });
+
+                const jitter = () => (Math.random() - 0.5) * 3.5;
 
                 const normPos = new Float32Array(normIdx.length * 3);
                 const normCol = new Float32Array(normIdx.length * 3);
                 normIdx.forEach((src, dst) => {
-                    normPos[dst*3] = data.positions[src*3]; normPos[dst*3+1] = data.positions[src*3+1]; normPos[dst*3+2] = data.positions[src*3+2];
+                    normPos[dst*3] = data.positions[src*3] + jitter();
+                    normPos[dst*3+1] = data.positions[src*3+1] + jitter();
+                    normPos[dst*3+2] = data.positions[src*3+2] + jitter();
                     const [r, g, b] = tempToRGB(data.temperatures[src]);
-                    normCol[dst*3] = r; normCol[dst*3+1] = g; normCol[dst*3+2] = b;
+                    normCol[dst*3] = r;
+                    normCol[dst*3+1] = g; normCol[dst*3+2] = b;
                 });
 
                 const normGeo = new THREE.BufferGeometry();
                 normGeo.setAttribute('position', new THREE.BufferAttribute(normPos, 3));
                 normGeo.setAttribute('color', new THREE.BufferAttribute(normCol, 3));
-                
                 const normMat = new THREE.PointsMaterial({
                     vertexColors: true, size: 2.5, sizeAttenuation: true,
-                    transparent: true, opacity: 0.88, map: starTexture, alphaTest: 0.05, depthWrite: false
+                    transparent: true, opacity: 0.50, map: starTexture,
+                    alphaTest: 0.05, depthWrite: false
                 });
-                disposables.push(normGeo, normMat);
                 pointsRef = new THREE.Points(normGeo, normMat);
                 pointsRef.userData.indexMap = normIdx;
                 spaceGroup.add(pointsRef);
+                disposables.push(normGeo, normMat);
 
                 if (grialIdx.length > 0) {
                     const gPos = new Float32Array(grialIdx.length * 3);
                     grialIdx.forEach((src, dst) => { gPos[dst*3] = data.positions[src*3]; gPos[dst*3+1] = data.positions[src*3+1]; gPos[dst*3+2] = data.positions[src*3+2]; });
                     const gGeo = new THREE.BufferGeometry(); gGeo.setAttribute('position', new THREE.BufferAttribute(gPos, 3));
-                    const grialMat = new THREE.PointsMaterial({
-                        color: 0xf1c40f, size: 9.0, sizeAttenuation: true,
-                        transparent: true, map: starTexture, alphaTest: 0.05, depthWrite: false
-                    });
-                    disposables.push(gGeo, grialMat);
-                    grialPointsRef = new THREE.Points(gGeo, grialMat);
+                    const gMat = new THREE.PointsMaterial({ color: 0xf1c40f, size: 9.0, sizeAttenuation: true, transparent: true, map: starTexture, alphaTest: 0.05, depthWrite: false });
+                    grialPointsRef = new THREE.Points(gGeo, gMat);
                     grialPointsRef.userData.indexMap = grialIdx;
                     spaceGroup.add(grialPointsRef);
+                    const glowGrialMat = new THREE.PointsMaterial({ color: 0xf39c12, size: 11.0, sizeAttenuation: true, transparent: true, opacity: 0.18 });
+                    spaceGroup.add(new THREE.Points(gGeo, glowGrialMat));
+                    disposables.push(gGeo, gMat, glowGrialMat);
+                }
+
+                if (iaIdx.length > 0) {
+                    const iaPos = new Float32Array(iaIdx.length * 3);
+                    iaIdx.forEach((src, dst) => { iaPos[dst*3] = data.positions[src*3]; iaPos[dst*3+1] = data.positions[src*3+1]; iaPos[dst*3+2] = data.positions[src*3+2]; });
+                    const iaGeo = new THREE.BufferGeometry(); iaGeo.setAttribute('position', new THREE.BufferAttribute(iaPos, 3));
+                    const iaMat = new THREE.PointsMaterial({ color: 0x00d4ff, size: 4.5, sizeAttenuation: true });
+                    iaPointsRef = new THREE.Points(iaGeo, iaMat);
+                    iaPointsRef.userData.indexMap = iaIdx;
+                    spaceGroup.add(iaPointsRef);
+                    const glowIaMat = new THREE.PointsMaterial({ color: 0x00d4ff, size: 9.0, sizeAttenuation: true, transparent: true, opacity: 0.15 });
+                    spaceGroup.add(new THREE.Points(iaGeo, glowIaMat));
+                    disposables.push(iaGeo, iaMat, glowIaMat);
                 }
 
                 document.getElementById('h-total').textContent = data.meta.total.toLocaleString('es-AR') + ' EXOPLANETAS';
-                document.getElementById('h-labeled').textContent = data.meta.labeled.toLocaleString('es-AR');
-                document.getElementById('h-griales').textContent = data.meta.griales + ' CANDIDATOS';
+                document.getElementById('h-ia-candidates').textContent = (data.meta.ia_candidates || 0) + ' DETECTADOS';
+                document.getElementById('h-griales').textContent = (data.meta.griales || 0) + ' CONFIRMADOS';
+                document.getElementById('h-exoticos').textContent = (data.meta.exoticos || 0) + ' REGISTRADOS';
+                document.getElementById('h-inhospitos').textContent = (data.meta.inhospitos || 0) + ' DESCARTADOS';
 
                 setStatus('Catálogo inicializado', 100);
                 setTimeout(() => { 
@@ -386,7 +520,8 @@
             if (!window.Hands || !window.Camera) { statusText.textContent = "Error de IA"; return; }
 
             handsRef = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
-            handsRef.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+            const hands = handsRef;
+            hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
 
             handsRef.onResults((results) => {
                 isGrabbingSpace = false; handCursor.style.display = 'none'; virtualPointer.x = -999; 
@@ -446,7 +581,6 @@
                     } else {
                         lastZoomDist = 0;
                         
-                        // SEPARACIÓN EXPLÍCITA DE MANOS
                         const pointer = parsedHands.find(h => h.isPointing);
                         const pincher = parsedHands.find(h => h.isPinching);
                         const grabber = parsedHands.find(h => h.isGrabbing);
@@ -462,7 +596,6 @@
                             targetRotationY = spaceGroup.rotation.y; targetRotationX = spaceGroup.rotation.x;
                         }
 
-                        // LÓGICA DE APUNTADO Y CLIC A DOS MANOS
                         if (pointer) {
                             const screenX = (1 - pointer.indexTip.x) * window.innerWidth;
                             const screenY = pointer.indexTip.y * window.innerHeight;
@@ -477,7 +610,6 @@
                             virtualPointer.y = -(smoothTargetY / window.innerHeight) * 2 + 1;
                             tooltip.style.left = `${smoothTargetX + 24}px`; tooltip.style.top = `${smoothTargetY - 16}px`;
 
-                            // Si detectamos un "pincher" (la otra mano haciendo pellizco), disparamos el clic
                             if (pincher) {
                                 handCursor.className = 'pinching';
                                 if (!wasPinching) seleccionarEstrella();
@@ -490,7 +622,6 @@
                             wasPinching = false; 
                         }
                         
-                        // FEEDBACK VISUAL IA
                         if (pointer && pincher) {
                             statusText.style.color = "var(--gold)"; statusText.textContent = "Apuntando y Clic (2 Manos)";
                         } else if (grabber && pointer) {
@@ -513,7 +644,7 @@
                 }
             });
 
-            cameraUtilsRef = new Camera(videoElement, { onFrame: async () => { await handsRef.send({ image: videoElement }); }, width: 320, height: 240 });
+            cameraUtilsRef = new Camera(videoElement, { onFrame: async () => { await hands.send({ image: videoElement }); }, width: 320, height: 240 });
             cameraUtilsRef.start().then(() => { statusText.textContent = "Sistema IA Listo"; });
         }
 
@@ -521,9 +652,11 @@
         // 4. BUCLE DE INTERACCIÓN Y RENDER
         // ==========================================
         window.addEventListener('mousemove', (e) => {
-            if (virtualPointer.x === -999) {
-                virtualPointer.x = (e.clientX / innerWidth) * 2 - 1; virtualPointer.y = -(e.clientY / innerHeight) * 2 + 1;
-                tooltip.style.left = `${e.clientX + 24}px`; tooltip.style.top = `${e.clientY - 16}px`;
+            if (!document.getElementById('hand-cursor').classList.contains('pointing')) {
+                virtualPointer.x = (e.clientX / innerWidth) * 2 - 1; 
+                virtualPointer.y = -(e.clientY / innerHeight) * 2 + 1;
+                tooltip.style.left = `${e.clientX + 24}px`; 
+                tooltip.style.top = `${e.clientY - 16}px`;
             }
         });
         
@@ -539,11 +672,12 @@
                 document.getElementById('target-panel').style.display = 'block';
                 document.getElementById('t-selected-name').textContent = nombre;
 
-                const typeText = tc === 2 ? '★ Tierra 2.0 (Habitable)' : tc === 1 ? 'Mundo Exótico' : tc === 0 ? 'Mundo Inhóspito' : 'Desconocido';
-                const typeColor = tc === 2 ? 'var(--gold)' : tc === 1 ? 'var(--cyan)' : 'rgba(255,255,255,0.5)';
+                const typeText = tc === 3 ? '♦ Hallazgo IA' : tc === 2 ? '★ Tierra 2.0 (Habitable)' : tc === 1 ? 'Mundo Exótico' : tc === 0 ? 'Mundo Inhóspito' : 'Desconocido';
+                const typeColor = tc === 3 ? 'var(--cyan)' : tc === 2 ? 'var(--gold)' : tc === 1 ? '#e67e22' : 'rgba(255,255,255,0.5)';
 
                 let desc = `Este sistema exoplanetario orbita una estrella principal con una temperatura superficial de ${teff}K. `;
-                if (tc === 2) desc += `Con un radio estimado de ${radio} masas terrestres y orbitando en la zona de habitabilidad de su sistema, es un fuerte candidato para albergar agua líquida y condiciones favorables para la vida tal como la conocemos.`;
+                if (tc === 3) desc += `Ha sido etiquetado por nuestra IA debido a su alto IHP. Requiere confirmación telemétrica pero presenta características atmosféricas prometedoras.`;
+                else if (tc === 2) desc += `Con un radio estimado de ${radio} masas terrestres y orbitando en la zona de habitabilidad de su sistema, es un fuerte candidato para albergar agua líquida y condiciones favorables para la vida tal como la conocemos.`;
                 else if (tc === 1) desc += `Sus características anómalas y su tamaño de ${radio} R⊕ lo categorizan como un mundo exótico, sugiriendo una composición química inusual o densas capas atmosféricas.`;
                 else desc += `Debido a la radiación estelar y su radio de ${radio} R⊕, las condiciones son extremadamente hostiles. Probablemente se trate de un gigante gaseoso abrasador o una roca estéril sin atmósfera.`;
 
@@ -567,10 +701,19 @@
         }
 
         function renderHover() {
-            if (!pointsRef || virtualPointer.x === -999) { tooltip.style.display = 'none'; hoveredStarIndex = null; return; }
+            const targets = [];
+            if (pointsRef) targets.push(pointsRef);
+            if (grialPointsRef) targets.push(grialPointsRef);
+            if (iaPointsRef) targets.push(iaPointsRef);
+
+            if (targets.length === 0 || virtualPointer.x === -999) { 
+                tooltip.style.display = 'none'; 
+                hoveredStarIndex = null; 
+                reticle.material.opacity = 0;
+                return; 
+            }
             
             raycaster.setFromCamera(virtualPointer, camera);
-            const targets = grialPointsRef ? [pointsRef, grialPointsRef] : [pointsRef];
             const intersects = raycaster.intersectObjects(targets);
 
             if (intersects.length > 0) {
@@ -582,25 +725,58 @@
                 document.getElementById('tt-teff').textContent = `Estrella: ${Math.round(catalog.temps[hoveredStarIndex] || 0)} K`;
                 document.getElementById('tt-rade').textContent = `Radio: ${(catalog.radii[hoveredStarIndex] || 0).toFixed(2)} R⊕`;
                 
+                const ihpVal = catalog.ihps ? catalog.ihps[hoveredStarIndex] || 0 : 0;
+                const iaVal = catalog.score_ia ? catalog.score_ia[hoveredStarIndex] || 0 : 0;
+                const hellerVal = catalog.score_heller ? catalog.score_heller[hoveredStarIndex] || 0 : 0;
+                
+                const ttIhp = document.getElementById('tt-ihp');
+                if (tc === 3 || tc === 2) {
+                    ttIhp.style.display = 'block';
+                    ttIhp.innerHTML = `
+                            <div style="color:var(--cyan)">IHP TOTAL: ${ihpVal}%</div>
+                            <div style="font-size:8px; opacity:0.7; margin-top:2px; color: #fff;">
+                            IA: ${iaVal}% | Heller: ${hellerVal}%
+                            </div>
+                        `;
+                } else {
+                    ttIhp.style.display = 'none';
+                }
+                
                 const grialText = document.getElementById('tt-grial');
-                grialText.textContent = tc === 2 ? '★ TIERRA 2.0' : tc === 1 ? 'Mundo Exótico' : tc === 0 ? 'Mundo Inhóspito' : 'Desconocido';
-                grialText.style.color = tc === 2 ? 'var(--gold)' : 'rgba(255,255,255,0.4)';
+                grialText.textContent = tc === 3 ? '♦ DESCUBRIMIENTO IA' : tc === 2 ? '★ TIERRA 2.0 (GRIAL)' : tc === 1 ? 'Mundo Exótico' : tc === 0 ? 'Mundo Inhóspito' : 'Desconocido';
+                grialText.style.color = tc === 3 ? 'var(--cyan)' : tc === 2 ? 'var(--gold)' : 'rgba(255,255,255,0.4)';
 
                 tooltip.style.display = 'block'; document.body.style.cursor = 'pointer';
-            } else { tooltip.style.display = 'none'; document.body.style.cursor = 'crosshair'; hoveredStarIndex = null; }
+            } else {
+                reticle.material.opacity = 0;
+                tooltip.style.display = 'none'; document.body.style.cursor = 'crosshair';
+                hoveredStarIndex = null;
+            }
         }
 
         function animate() {
             animFrameId = requestAnimationFrame(animate);
-            if (autoRotate) { autoRotateY += 0.00025; spaceGroup.rotation.y = autoRotateY; } 
+            if (autoRotate) { autoRotateY += 0.00050; spaceGroup.rotation.y = autoRotateY; } 
             else if (isGrabbingSpace) {
                 spaceGroup.rotation.y += (targetRotationY - spaceGroup.rotation.y) * 0.04;
                 spaceGroup.rotation.x += (targetRotationX - spaceGroup.rotation.x) * 0.04;
             }
-            renderHover(); controls.update(); renderer.render(scene, camera);
+
+            if (stardust) {
+                stardust.rotation.y -= 0.001;
+                stardust.rotation.x += 0.002;
+            }
+
+            renderHover(); controls.update(); 
+            composer.render(); // Se usa composer en lugar de renderer directo por el efecto Bloom
         }
 
-        window.addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+        window.addEventListener('resize', () => { 
+            camera.aspect = innerWidth / innerHeight; 
+            camera.updateProjectionMatrix(); 
+            renderer.setSize(innerWidth, innerHeight); 
+            composer.setSize(innerWidth, innerHeight);
+        });
         
         loadCatalog(); initWebcamAndAI(); animate();
     </script>
