@@ -225,6 +225,29 @@
 
         const API_URL = window.location.protocol === 'file:' ? 'http://localhost:8000/api/exoplanets' : '/api/exoplanets';
 
+
+        const disposables = [];
+        let animFrameId = null;
+        let cameraUtilsRef = null;
+        let handsRef = null;
+
+        function cleanupWebGL() {
+            disposables.forEach(obj => obj.dispose());
+            disposables.length = 0;
+            if (pointsRef) { spaceGroup.remove(pointsRef); pointsRef = null; }
+            if (grialPointsRef) { spaceGroup.remove(grialPointsRef); grialPointsRef = null; }
+        }
+
+        function cleanupAll() {
+            cancelAnimationFrame(animFrameId);
+            if (cameraUtilsRef) cameraUtilsRef.stop();
+            if (handsRef) handsRef.close();
+            cleanupWebGL();
+            renderer.dispose();
+        }
+
+        window.addEventListener('beforeunload', cleanupAll);
+
         // ==========================================
         // GESTIÓN DE CICLO DE VIDA DE RECURSOS
         // ==========================================
@@ -500,7 +523,7 @@
             const hands = handsRef;
             hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
 
-            hands.onResults((results) => {
+            handsRef.onResults((results) => {
                 isGrabbingSpace = false; handCursor.style.display = 'none'; virtualPointer.x = -999; 
                 
                 if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {

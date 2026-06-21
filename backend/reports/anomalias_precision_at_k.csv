@@ -1,0 +1,5 @@
+k,griales_en_topk,precision_at_k,recall_at_k
+10,3,0.3,0.6
+20,3,0.15,0.6
+50,4,0.08,0.8
+100,5,0.05,1.0
