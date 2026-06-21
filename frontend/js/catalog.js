@@ -72,11 +72,11 @@ export async function loadCatalog() {
             clearTimeout(fetchTimeout);
             // Datos de demostración cuando la API no está disponible
             res = { ok: true, json: async () => ({
-                meta: { total: 1000, labeled: 100, griales: 5, ia_candidates: 12, exoticos: 80, inhospitos: 903 },
+                meta: { total: 1000, labeled: 100, griales: 5, ia_candidates: 12, inhospitos: 983 },
                 positions:     Array.from({ length: 3000 }, () => (Math.random() - 0.5) * 10000),
                 temperatures:  Array.from({ length: 1000 }, () => Math.random() * 8000 + 2000),
                 radii:         Array.from({ length: 1000 }, () => Math.random() * 5),
-                target_classes: Array.from({ length: 1000 }, () => Math.random() > 0.95 ? 2 : 0),
+                target_classes: Array.from({ length: 1000 }, () => Math.random() > 0.95 ? 1 : 0),
                 names:         Array.from({ length: 1000 }, (_, i) => `Kepler-${i}`),
                 ihp:           [], score_ia: [], score_heller: [],
             })};
@@ -100,14 +100,14 @@ export async function loadCatalog() {
         // Clasificar índices por tipo
         const normIdx = [], grialIdx = [], iaIdx = [];
         data.target_classes.forEach((tc, i) => {
-            if      (tc === 2) grialIdx.push(i);
-            else if (tc === 3) iaIdx.push(i);
+            if      (tc === 1) grialIdx.push(i);
+            else if (tc === 2) iaIdx.push(i);
             else               normIdx.push(i);
         });
 
         const jitter = () => (Math.random() - 0.5) * 3.5;
 
-        // Planetas normales (clases 0 y 1)
+        // Planetas normales (clase 0)
         const normPos = new Float32Array(normIdx.length * 3);
         const normCol = new Float32Array(normIdx.length * 3);
         normIdx.forEach((src, dst) => {
@@ -130,7 +130,7 @@ export async function loadCatalog() {
         spaceGroup.add(state.pointsRef);
         state.disposables.push(normGeo, normMat);
 
-        // Griales (clase 2)
+        // Griales (clase 1)
         if (grialIdx.length > 0) {
             const gPos = new Float32Array(grialIdx.length * 3);
             grialIdx.forEach((src, dst) => {
@@ -146,7 +146,7 @@ export async function loadCatalog() {
             state.disposables.push(gGeo, gMat, gGlow);
         }
 
-        // Hallazgos IA (clase 3)
+        // Hallazgos IA (clase 2)
         if (iaIdx.length > 0) {
             const iaPos = new Float32Array(iaIdx.length * 3);
             iaIdx.forEach((src, dst) => {
@@ -166,7 +166,6 @@ export async function loadCatalog() {
         document.getElementById('h-total').textContent       = data.meta.total.toLocaleString('es-AR') + ' EXOPLANETAS';
         document.getElementById('h-ia-candidates').textContent = (data.meta.ia_candidates || 0) + ' DETECTADOS';
         document.getElementById('h-griales').textContent     = (data.meta.griales   || 0) + ' CONFIRMADOS';
-        document.getElementById('h-exoticos').textContent    = (data.meta.exoticos  || 0) + ' REGISTRADOS';
         document.getElementById('h-inhospitos').textContent  = (data.meta.inhospitos || 0) + ' DESCARTADOS';
 
         setStatus('Catálogo inicializado', 100);

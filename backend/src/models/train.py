@@ -12,28 +12,33 @@ from sklearn.ensemble import IsolationForest
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 from src.models.autoencoder import AstronomusAE, ExoplanetUnsupervisedDataset
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S')
+logger = logging.getLogger(__name__)
 
 DIR_GOLD = "backend/data/gold"
 DIR_SILVER = "backend/data/silver"
 DIR_ARTEFACTOS = "backend/artifacts/models"
 os.makedirs(DIR_ARTEFACTOS, exist_ok=True)
 
-EPOCHS = 150
+EPOCHS = 200
 BATCH_SIZE = 64
 LEARNING_RATE = 0.001
 
-def ejecutar_pipeline_hibrido():
-    logging.info("Iniciando Pipeline Híbrido (Weighted AE + Isolation Forest)...")
+def ejecutar_entrenamiento_del_modelo():
+    # Pipeline de entrenamiento híbrido: Autoencoder + Isolation Forest + IHP
+    logger.info("Iniciando Entrenamiento del Modelo...")
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
+    torch.manual_seed(42)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(42)
+
     try:
         df_scaled = pd.read_csv(f"{DIR_GOLD}/X_scaled.csv")
         y_df = pd.read_csv(f"{DIR_GOLD}/y.csv")
         df_completo_plata = pd.read_csv(f"{DIR_SILVER}/data_lake_consolidado.csv", low_memory=False)
         df_completo_oro = pd.read_csv(f"{DIR_GOLD}/dataset_preparado_ml.csv", low_memory=False)
     except FileNotFoundError as e:
-        logging.error(f"Falta archivo de datos: {e}")
+        logger.error("Falta archivo de datos: %s", e)
         return
 
     # Separar IDs para alineación segura
@@ -42,16 +47,18 @@ def ejecutar_pipeline_hibrido():
     features = X_scaled_df.columns.tolist()
     
     # Estrategia Conservadora: Entrenar SOLO con planetas etiquetados como no-habitables
-    mask_normales = (y_df['target_class'] == 0) | (y_df['target_class'] == 1)
+    mask_normales = y_df['target_class'] == 0
     X_train_normales = X_scaled_df[mask_normales]
 
-    logging.info(f"Universo de entrenamiento (Normalidad etiquetada): {len(X_train_normales)} planetas.")
+    logger.info("Universo de entrenamiento (Normalidad etiquetada): %d planetas.", len(X_train_normales))
 
     # ==========================================
     # FASE 1: ENTRENAMIENTO AUTOENCODER
     # ==========================================
-    logging.info("--- Fase 1: Entrenamiento Autoencoder ---")
+    logger.info("--- Fase 1: Entrenamiento Autoencoder ---")
     dataset_ae = ExoplanetUnsupervisedDataset(X_train_normales)
+    _dl_generator = torch.Generator()
+    _dl_generator.manual_seed(42)
     dataloader = DataLoader(
         dataset_ae,
         batch_size=BATCH_SIZE,
@@ -60,6 +67,8 @@ def ejecutar_pipeline_hibrido():
         num_workers=2,
         pin_memory=device.type == "cuda",
         persistent_workers=True,
+        generator=_dl_generator,
+        worker_init_fn=lambda wid: torch.manual_seed(42 + wid),
     )
     
     modelo_ae = AstronomusAE(input_dim=len(features)).to(device)
@@ -84,7 +93,7 @@ def ejecutar_pipeline_hibrido():
         scheduler.step()
         
         if (epoch + 1) % 25 == 0:
-            logging.info("  Época [%d/%d] - MSE: %.4f | LR: %.6f", 
+            logger.info("  Época [%d/%d] - MSE: %.4f | LR: %.6f", 
                          epoch+1, EPOCHS, loss_acumulada/len(dataloader), scheduler.get_last_lr()[0])
 
     torch.save(modelo_ae.state_dict(), f"{DIR_ARTEFACTOS}/astronomus_ae.pth")
@@ -92,14 +101,14 @@ def ejecutar_pipeline_hibrido():
     # ==========================================
     # FASE 2: ISOLATION FOREST
     # ==========================================
-    logging.info("--- Fase 2: Isolation Forest ---")
+    logger.info("--- Fase 2: Isolation Forest ---")
     modelo_if = IsolationForest(n_estimators=200, contamination='auto', random_state=42)
     modelo_if.fit(X_train_normales.values)
 
     # ==========================================
     # FASE 3: EVALUACIÓN Y RANKEADO
     # ==========================================
-    logging.info("--- Fase 3: Evaluación de Anomalías Globales ---")
+    logger.info("--- Fase 3: Evaluación de Anomalías Globales ---")
     X_todo_tensor = torch.tensor(X_scaled_df.values, dtype=torch.float32).to(device)
     
     # Aplicar MSE ponderado por astrofísica
@@ -125,7 +134,7 @@ def ejecutar_pipeline_hibrido():
     # ==========================================
     # FASE 4: ÍNDICE DE HABITABILIDAD PLANETARIA (Modelo Heller)
     # ==========================================
-    logging.info("--- Fase 4: Cálculo del IHP (Rareza IA + Súper-Habitabilidad Heller) ---")
+    logger.info("--- Fase 4: Cálculo del IHP (Rareza IA + Súper-Habitabilidad Heller) ---")
     
     # 1. Conservamos la métrica de Excepcionalidad de la IA
     df_ranking['excepcionalidad_ia'] = df_ranking['hybrid_score']
@@ -147,7 +156,7 @@ def ejecutar_pipeline_hibrido():
     
     # 4. El Bounding Box Físico Duro (La guillotina de los gigantes gaseosos)
     mask_habitable = (
-        (df_ranking['pl_rade'] <= 2.5) & 
+        (df_ranking['pl_rade'] <= 2.0) & 
         (df_ranking['pl_eqt'] >= 150) & 
         (df_ranking['pl_eqt'] <= 500)
     )
@@ -169,12 +178,17 @@ def ejecutar_pipeline_hibrido():
     df_ranking = df_ranking.sort_values(by='ihp', ascending=False).reset_index(drop=True)
 
     # 6. Umbral Estadístico y Pseudo-etiquetado
-    umbral_ia = df_ranking[df_ranking['ihp'] > 0]['ihp'].quantile(0.96)
+    umbral_ia = df_ranking[df_ranking['ihp'] > 0]['ihp'].quantile(0.955)
     mask_candidatos = (df_ranking['target_class'] == -1) & (df_ranking['ihp'] >= umbral_ia)
     nuevos_hallazgos = mask_candidatos.sum()
-    df_ranking.loc[mask_candidatos, 'target_class'] = 3
-    
-    logging.info(f"Umbral IA fijado en IHP: {umbral_ia:.2f}%. Hallazgos IA etiquetados: {nuevos_hallazgos}")
+    df_ranking.loc[mask_candidatos, 'target_class'] = 2
+
+    # Los huérfanos que no alcanzaron el umbral IA se clasifican como Inhóspitos
+    huerfanos_reclasificados = (df_ranking['target_class'] == -1).sum()
+    df_ranking.loc[df_ranking['target_class'] == -1, 'target_class'] = 0
+
+    logger.info("Umbral IA fijado en IHP: %.2f%%. Hallazgos IA etiquetados: %d | Huérfanos → Inhóspito: %d",
+                umbral_ia, nuevos_hallazgos, huerfanos_reclasificados)
     
     df_final = pd.merge(
         df_ranking[['pl_name', 'target_class', 'ihp', 'score_ia', 'score_heller']],
@@ -191,15 +205,25 @@ def ejecutar_pipeline_hibrido():
     cols_diagnostico = ['pl_name', 'ihp', 'pl_rade', 'pl_eqt', 'pl_insol', 'st_teff', 'st_mass']
     cols_presentes = [c for c in cols_diagnostico if c in df_ranking.columns]
     
-    nuevos = df_ranking[df_ranking['target_class'] == 3]
-    logging.info("\n── PERFIL DE LOS %d HALLAZGOS IA ──", len(nuevos))
-    print(nuevos[cols_presentes].sort_values('ihp', ascending=False).to_string(index=False))
+    nuevos = df_ranking[df_ranking['target_class'] == 2]
+    logger.info("\n── PERFIL DE LOS %d HALLAZGOS IA ──", len(nuevos))
+    print(nuevos[cols_presentes].sort_values('ihp', ascending=False).to_string(index=False, float_format=lambda x: f"{x:.2f}"))
 
-    griales = df_ranking[df_ranking['target_class'] == 2]
-    logging.info("\n── GRIALES CONOCIDOS (Validación) ──")
-    print(griales[cols_presentes].sort_values('ihp', ascending=False).to_string(index=False))
-    
-    logging.info("\nPipeline completado exitosamente. Ranking exportado con IHP real.")
+    griales = df_ranking[df_ranking['target_class'] == 1]
+    logger.info("\n── GRIALES CONOCIDOS (Validación) ──")
+    print(griales[cols_presentes].sort_values('ihp', ascending=False).to_string(index=False, float_format=lambda x: f"{x:.2f}"))
+
+    inhospitos = (df_ranking['target_class'] == 0).sum()
+    print("\n" + "="*50)
+    print(" RESUMEN DE ETIQUETADO FINAL:")
+    print(f"  - Clase  2 [Hallazgos IA         ]: {len(nuevos):>5}")
+    print(f"  - Clase  1 [Tierra 2.0 (Grial)   ]: {len(griales):>5}")
+    print(f"  - Clase  0 [Inhóspito            ]: {inhospitos:>5}  ({huerfanos_reclasificados} reclasificados desde huérfanos)")
+    print(f"  - TOTAL                           : {len(df_ranking):>5}")
+    print("="*50 + "\n")
+
+    logger.info("Pipeline completado exitosamente. Ranking exportado con IHP real.")
 
 if __name__ == "__main__":
-    ejecutar_pipeline_hibrido()
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S')
+    ejecutar_entrenamiento_del_modelo()

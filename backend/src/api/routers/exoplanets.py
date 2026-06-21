@@ -91,10 +91,9 @@ def get_exoplanets() -> JSONResponse:
         "meta": {
             "total":          len(silver),
             "labeled":        int((silver["target_class"] >= 0).sum()),
-            "griales":        int((silver["target_class"] == 2).sum()),
-            "ia_candidates":  int((silver["target_class"] == 3).sum()), 
-            "exoticos":       int((silver["target_class"] == 1).sum()),
-            "inhospitos":     int((silver["target_class"] <= 0).sum()),  
+            "griales":        int((silver["target_class"] == 1).sum()),
+            "ia_candidates":  int((silver["target_class"] == 2).sum()),
+            "inhospitos":     int((silver["target_class"] <= 0).sum()),
             "schema_version": "1.0",
         },
         "positions":      np.column_stack([x, y, z]).flatten().round(4).tolist(),

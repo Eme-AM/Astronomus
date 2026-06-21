@@ -6,6 +6,8 @@ import { camera, spaceGroup, stardust, composer, controls, reticle } from './sce
 Interacción: raycasting para hover/selección de estrellas, bucle de animación y listeners de mouse.
 */
 
+// TODO: Hay confirmados que aparecen como exóticos. Necesaria revisión.
+
 const raycaster = new THREE.Raycaster();
 raycaster.params.Points.threshold = 1.2;
 

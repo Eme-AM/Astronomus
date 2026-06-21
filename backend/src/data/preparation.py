@@ -6,7 +6,7 @@ import numpy as np
 from dataclasses import dataclass
 from sklearn.preprocessing import RobustScaler
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S')
+logger = logging.getLogger(__name__)
 
 # ==========================================
 # CONFIGURACIÓN GLOBALES Y CONSTANTES
@@ -15,7 +15,7 @@ RUTA_SILVER = "backend/data/silver/data_lake_consolidado.csv"
 RUTA_GOLD_DIR = "backend/data/gold"
 ARCHIVO_PREPARADO = f"{RUTA_GOLD_DIR}/dataset_preparado_ml.csv"
 
-UMBRAL_ESI_GRIAL = 0.80
+UMBRAL_ESI_GRIAL = 0.75
 MINIMO_FILAS_VIABLE = 500
 
 FEATURES_MODELO = [
@@ -34,20 +34,19 @@ class ArtefactosML:
 
 def cargar_capa_plata(ruta: str = RUTA_SILVER) -> pd.DataFrame:
     if not os.path.exists(ruta):
-        logging.error("No se encontró el archivo de la Capa Plata.")
+        logger.error("No se encontró el archivo de la Capa Plata.")
         raise FileNotFoundError(f"Archivo faltante: {ruta}")
     return pd.read_csv(ruta)
 
 def codificar_super_target(df: pd.DataFrame) -> pd.DataFrame:
-    logging.info("Iniciando la construcción del Súper Target (Target Engineering)...")
+    logger.info("Iniciando la construcción del Súper Target (Target Engineering)...")
     df_ml = df.copy()
     
     df_ml['target_class'] = -1
     mask_etiquetados = df_ml['phl_esi'].notna() & df_ml['phl_habitable'].notna()
     
     df_ml.loc[mask_etiquetados, 'target_class'] = 0
-    df_ml.loc[mask_etiquetados & (df_ml['phl_habitable'] > 0) & (df_ml['phl_esi'] < UMBRAL_ESI_GRIAL), 'target_class'] = 1
-    df_ml.loc[mask_etiquetados & (df_ml['phl_habitable'] > 0) & (df_ml['phl_esi'] >= UMBRAL_ESI_GRIAL), 'target_class'] = 2
+    df_ml.loc[mask_etiquetados & (df_ml['phl_habitable'] > 0) & (df_ml['phl_esi'] >= UMBRAL_ESI_GRIAL), 'target_class'] = 1
 
     if len(df_ml) < MINIMO_FILAS_VIABLE:
         raise ValueError(f"Dataset resultante ({len(df_ml)} filas) por debajo del mínimo viable.")
@@ -57,7 +56,7 @@ def codificar_super_target(df: pd.DataFrame) -> pd.DataFrame:
 def auditar_desbalanceo(df: pd.DataFrame) -> None:
     conteo_clases = df['target_class'].value_counts().sort_index()
     porcentajes = df['target_class'].value_counts(normalize=True).sort_index() * 100
-    mapa_nombres = {-1: "Huérfanos", 0: "Inhóspito", 1: "Exótico", 2: "Tierra 2.0 (Grial)"}
+    mapa_nombres = {-1: "Huérfanos", 0: "Inhóspito", 1: "Tierra 2.0 (Grial)"}
     
     print("\n" + "="*60)
     print(" AUDITORÍA DE CLASES (SUPER-TARGET):")
@@ -75,16 +74,15 @@ def _aplicar_log_transform(df: pd.DataFrame) -> pd.DataFrame:
     return df_transformado
 
 def escalar_y_exportar(df_ml: pd.DataFrame) -> ArtefactosML:
-    logging.info("Iniciando transformación matemática y escalado...")
+    logger.info("Iniciando transformación matemática y escalado...")
     
     X = df_ml[FEATURES_MODELO]
     y = df_ml['target_class']
     X_log = _aplicar_log_transform(X)
 
-    # Entrenar el escalador SOLO con planetas etiquetados no-excepcionales (clases 0 y 1).
-    # Excluir clase -1 (desconocidos) evita que posibles Griales sin etiquetar sesguen
-    # los percentiles del scaler. Excluir clase 2 (Grial) es el criterio original.
-    mask_para_scaler = (y == 0) | (y == 1)
+    # Entrenar el escalador SOLO con Inhóspitos (clase 0): la clase más grande y "normal".
+    # Excluir clase 1 (Grial) evita que la rareza de los candidatos sesgue los percentiles.
+    mask_para_scaler = y == 0
     escalador = RobustScaler()
     escalador.fit(X_log[mask_para_scaler])
     
@@ -105,11 +103,11 @@ def escalar_y_exportar(df_ml: pd.DataFrame) -> ArtefactosML:
     joblib.dump(escalador, "backend/artifacts/robust_scaler.pkl")
     joblib.dump(FEATURES_MODELO, "backend/artifacts/feature_cols.pkl")
 
-    logging.info("Artefactos Oro guardados de forma segura. Total: %d planetas.", len(X_scaled))
+    logger.info("Artefactos Oro guardados de forma segura. Total: %d planetas.", len(X_scaled))
     return ArtefactosML(X_scaled, y, escalador, FEATURES_MODELO)
 
 def ejecutar_preparacion_target():
-    logging.info("Iniciando Capa Oro: Preparación del Dataset...")
+    logger.info("Iniciando Capa Oro: Preparación del Dataset...")
     df_plata = cargar_capa_plata()
     df_preparado = codificar_super_target(df_plata)
     auditar_desbalanceo(df_preparado)
@@ -118,7 +116,8 @@ def ejecutar_preparacion_target():
     df_preparado.to_csv(ARCHIVO_PREPARADO, index=False)
     
     escalar_y_exportar(df_preparado)
-    logging.info("¡Capa Oro construida exitosamente!")
+    logger.info("¡Capa Oro construida exitosamente!")
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S')
     ejecutar_preparacion_target()

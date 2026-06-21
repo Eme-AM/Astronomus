@@ -82,8 +82,8 @@ def cargar():
             "Corré primero:  py backend/src/models/train.py"
         )
     df = pd.read_csv(RANKING, low_memory=False)
-    # Universo etiquetado: clases 0/1/2 (los -1/3 son desconocidos/pseudo-labels)
-    df_lab = df[df["target_class"].isin([0, 1, 2])].copy().reset_index(drop=True)
+    # Universo etiquetado: clases 0/1 (los -1/2 son desconocidos/pseudo-labels IA)
+    df_lab = df[df["target_class"].isin([0, 1])].copy().reset_index(drop=True)
     return df, df_lab
 
 
@@ -95,16 +95,14 @@ def evaluar():
     log, lineas = log_factory()
 
     df, df_lab = cargar()
-    is_grial = (df_lab["target_class"] == 2).astype(int).values
-    is_hab = df_lab["target_class"].isin([1, 2]).astype(int).values
+    is_grial = (df_lab["target_class"] == 1).astype(int).values
 
     log("=" * 70)
     log(" MÉTRICAS DEL MODELO REAL — Detección de anomalías + ranking (IHP)")
     log("=" * 70)
     log(f" Universo etiquetado: {len(df_lab)} planetas "
-        f"(clase 0={int((df_lab.target_class==0).sum())}, "
-        f"1={int((df_lab.target_class==1).sum())}, "
-        f"2/Grial={int((df_lab.target_class==2).sum())})")
+        f"(clase 0/Inhóspito={int((df_lab.target_class==0).sum())}, "
+        f"clase 1/Grial={int((df_lab.target_class==1).sum())})")
     log(f" Catálogo total rankeado: {len(df)} planetas")
     log("")
 
@@ -114,8 +112,7 @@ def evaluar():
     log("    Pregunta: ¿la señal rankea arriba a los positivos reales?")
     log("-" * 70)
     filas_auc = []
-    for objetivo_nombre, objetivo in [("GRIAL (clase 2)", is_grial),
-                                      ("HABITABLE (clase 1∪2)", is_hab)]:
+    for objetivo_nombre, objetivo in [("GRIAL (clase 1)", is_grial)]:
         log(f"\n  Objetivo: {objetivo_nombre}  (positivos={int(objetivo.sum())})")
         log(f"    {'Señal':<28}{'ROC-AUC':>10}{'PR-AUC':>10}")
         for s in SENALES:
@@ -134,7 +131,7 @@ def evaluar():
     log("-" * 70)
     n_grial = int(is_grial.sum())
     orden_ihp = df_lab.sort_values("ihp", ascending=False).reset_index(drop=True)
-    pos_orden = (orden_ihp["target_class"] == 2).values
+    pos_orden = (orden_ihp["target_class"] == 1).values
     log(f"    {'k':>5}{'#Griales en top-k':>20}{'Precision@k':>14}{'Recall@k':>12}")
     filas_pk = []
     for k in KS:
@@ -149,7 +146,7 @@ def evaluar():
     log(" 3. POSICIÓN DE LOS GRIALES CONOCIDOS (ranking por IHP, universo etiquetado)")
     log("-" * 70)
     total = len(orden_ihp)
-    griales = orden_ihp[orden_ihp["target_class"] == 2]
+    griales = orden_ihp[orden_ihp["target_class"] == 1]
     log(f"    {'pl_name':<16}{'IHP':>8}{'rank':>8}{'percentil':>12}")
     for _, row in griales.iterrows():
         rank = int(orden_ihp.index[orden_ihp["pl_name"] == row["pl_name"]][0]) + 1
@@ -158,10 +155,10 @@ def evaluar():
 
     # ---------- 4. Vista estilo Clase #8: matriz de confusión umbralizada ----------
     log("\n" + "-" * 70)
-    log(" 4. VISTA CLASIFICACIÓN (Clase #8): umbral del modelo (cuantil 0.96 de IHP>0)")
+    log(" 4. VISTA CLASIFICACIÓN (Clase #8): umbral del modelo (cuantil 0.955 de IHP>0)")
     log("    Convierte el ranking en decisión binaria: ¿candidato excepcional?")
     log("-" * 70)
-    umbral = df.loc[df["ihp"] > 0, "ihp"].quantile(0.96)
+    umbral = df.loc[df["ihp"] > 0, "ihp"].quantile(0.955)
     y_pred = (df_lab["ihp"].values >= umbral).astype(int)
     cm = confusion_matrix(is_grial, y_pred, labels=[0, 1])
     log(f"    Umbral IHP = {umbral:.2f}")
@@ -192,7 +189,7 @@ def evaluar():
     log(f"    Correlación score_heller ↔ phl_esi : {corr_heller_esi:+.3f}")
     log(f"    Correlación score_ia     ↔ phl_esi : {corr_ia_esi:+.3f}")
     log("    Nota: el índice de Heller se construye con la misma física que el ESI, y")
-    log("    el Grial se DEFINE por ESI>=0.80. Si su AUC es alto pero el de score_ia no,")
+    log("    el Grial se DEFINE por ESI>=0.75. Si su AUC es alto pero el de score_ia no,")
     log("    significa que quien 'encuentra' los Griales es la FÍSICA, no la IA.")
 
     # ---------- 6. R² (vista regresión: predecir el ESI continuo desde el score) ----------
@@ -289,14 +286,14 @@ def graficar_roc_pr(df_lab, is_grial):
 
 def graficar_dispersion(df_lab):
     fig, ax = plt.subplots(figsize=(8, 6))
-    colores = {0: "#888888", 1: "#2a9d8f", 2: "#f1c40f"}
-    nombres = {0: "Inhóspito", 1: "Exótico", 2: "Tierra 2.0 (Grial)"}
-    for c in [0, 1, 2]:
+    colores = {0: "#888888", 1: "#f1c40f"}
+    nombres = {0: "Inhóspito", 1: "Tierra 2.0 (Grial)"}
+    for c in [0, 1]:
         sub = df_lab[df_lab["target_class"] == c]
         ax.scatter(sub["score_ia"], sub["score_heller"],
-                   s=80 if c == 2 else 12, alpha=0.7 if c == 2 else 0.35,
+                   s=80 if c == 1 else 12, alpha=0.7 if c == 1 else 0.35,
                    c=colores[c], label=f"{nombres[c]} (n={len(sub)})",
-                   edgecolors="k" if c == 2 else "none", zorder=3 if c == 2 else 1)
+                   edgecolors="k" if c == 1 else "none", zorder=3 if c == 1 else 1)
     ax.set_xlabel("score_ia (rareza IA)")
     ax.set_ylabel("score_heller (física)")
     ax.set_title("Señales del modelo por clase — ¿los Griales se separan?")

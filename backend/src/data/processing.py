@@ -17,11 +17,7 @@ from sklearn.impute import IterativeImputer
 # ==========================================
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%H:%M:%S'
-)
+logger = logging.getLogger(__name__)
 
 # Permitimos importar desde el core
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
@@ -76,7 +72,7 @@ def extract_bronce_data(ruta_raw: str = RUTA_RAW) -> tuple[pd.DataFrame, pd.Data
         df_phl = pd.read_csv(f"{ruta_raw}/phl_exoplanets.csv", low_memory=False)
         return df_nasa, df_eu, df_phl
     except FileNotFoundError as e:
-        logging.error(f"Falta un archivo en Bronce. Ejecutá ingestion.py primero. Detalle: {e}")
+        logger.error("Falta un archivo en Bronce. Ejecutá ingestion.py primero. Detalle: %s", e)
         raise
 
 def limpiar_y_filtrar(df_nasa: pd.DataFrame, df_eu: pd.DataFrame, df_phl: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -85,8 +81,12 @@ def limpiar_y_filtrar(df_nasa: pd.DataFrame, df_eu: pd.DataFrame, df_phl: pd.Dat
     # NASA (Base Maestra)
     cols_nasa = ['pl_name', 'ra', 'dec'] + COLS_FISICAS_MICE
     master_df = df_nasa[cols_nasa].copy()
+    nasa_bruto = len(master_df)
     master_df = master_df.dropna(subset=['ra', 'dec']).reset_index(drop=True)
-    
+    nasa_descartados = nasa_bruto - len(master_df)
+    if nasa_descartados > 0:
+        logger.warning("NASA: %d planeta/s descartado/s por falta de coordenadas (ra/dec nulos).", nasa_descartados)
+
     # EUROPA
     cols_eu = ['name', 'ra', 'dec', 'mass', 'radius', 'temp_calculated', 
                'orbital_period', 'eccentricity', 'star_teff', 'star_mass']
@@ -130,11 +130,12 @@ def ejecutar_entity_resolution(master_df: pd.DataFrame, df_eu_clean: pd.DataFram
     }).sort_values('distancia').drop_duplicates(subset='idx_nasa', keep='first')
     
     colisiones_eu = matches_eu.sum() - len(corr_eu)
-    if colisiones_eu > 0:
-        logging.warning("Entity Resolution EU: %d colisión/es resuelta/s (política: closest-wins).", colisiones_eu)
+    logger.info("Entity Resolution EU: %d/%d planetas emparejados con NASA%s.",
+                len(corr_eu), len(df_eu_clean),
+                f" ({colisiones_eu} colisión/es resuelta/s)" if colisiones_eu > 0 else "")
 
     cols_a_transferir = ['eu_mass_earth', 'eu_radius_earth', 'eu_temp', 'eu_orbital_period', 'eu_eccentricity', 'eu_star_teff', 'eu_star_mass']
-    eu_subset = df_eu_clean.loc[corr_eu['idx_eu'], cols_a_transferir]
+    eu_subset = df_eu_clean.loc[corr_eu['idx_eu'], cols_a_transferir].copy()
     eu_subset.index = corr_eu['idx_nasa'].values
     master_df.loc[eu_subset.index, cols_a_transferir] = eu_subset
     
@@ -150,10 +151,11 @@ def ejecutar_entity_resolution(master_df: pd.DataFrame, df_eu_clean: pd.DataFram
     }).sort_values('distancia').drop_duplicates(subset='idx_nasa', keep='first')
     
     colisiones_phl = matches_phl.sum() - len(corr_phl)
-    if colisiones_phl > 0:
-        logging.warning("Entity Resolution PHL: %d colisión/es resuelta/s (política: closest-wins).", colisiones_phl)
+    logger.info("Entity Resolution PHL: %d/%d planetas emparejados con NASA%s.",
+                len(corr_phl), len(df_phl_clean),
+                f" ({colisiones_phl} colisión/es resuelta/s)" if colisiones_phl > 0 else "")
 
-    phl_subset = df_phl_clean.loc[corr_phl['idx_phl'], ['P_ESI', 'P_HABITABLE']]
+    phl_subset = df_phl_clean.loc[corr_phl['idx_phl'], ['P_ESI', 'P_HABITABLE']].copy()
     phl_subset.index = corr_phl['idx_nasa'].values
     master_df.loc[phl_subset.index, ['P_ESI', 'P_HABITABLE']] = phl_subset.values
     
@@ -205,7 +207,7 @@ def imputar_datos(master_df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
 
     # Serializar el imputer fitted para uso en inferencia: permite llamar solo
     # .transform() sobre datos nuevos sin re-fit sobre datos mezclados (data leakage)
-    ruta_artifacts = os.path.join(os.path.dirname(__file__), "../../../artifacts")
+    ruta_artifacts = "backend/artifacts"
     os.makedirs(ruta_artifacts, exist_ok=True)
     joblib.dump(imputador_mice, os.path.join(ruta_artifacts, "mice_imputer.pkl"))
     
@@ -224,18 +226,18 @@ def imputar_datos(master_df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
 
 def ejecutar_procesamiento() -> pd.DataFrame:
     """Orquestador de la Capa Plata."""
-    logging.info("Iniciando Procesamiento (Capa Plata)...")
+    logger.info("Iniciando Procesamiento (Capa Plata)...")
     
     df_nasa, df_eu, df_phl = extract_bronce_data()
     master_df, df_eu_clean, df_phl_clean = limpiar_y_filtrar(df_nasa, df_eu, df_phl)
     
-    logging.info("Ejecutando Fuzzy Matching Espacial (Geometría 3D + Closest-Wins)...")
+    logger.info("Ejecutando Fuzzy Matching Espacial (Geometría 3D + Closest-Wins)...")
     master_df = ejecutar_entity_resolution(master_df, df_eu_clean, df_phl_clean)
     
-    logging.info("Aplicando Imputación Híbrida (Fusión -> Física -> MICE)...")
+    logger.info("Aplicando Imputación Híbrida (Fusión -> Física -> MICE)...")
     master_df, linaje = imputar_datos(master_df)
     
-    # Nuevo Reporte de Auditoría
+    # Reporte de Auditoría
     print("\n" + "="*50)
     print(" REPORTE DE LINAJE Y COBERTURA:")
     print(f"  - Planetas NASA sin etiqueta PHL  : {(master_df['phl_esi'].isna()).sum()}")
@@ -250,8 +252,9 @@ def ejecutar_procesamiento() -> pd.DataFrame:
     os.makedirs(RUTA_SILVER_DIR, exist_ok=True)
     master_df.to_csv(ARCHIVO_SALIDA, index=False)
     
-    logging.info(f"Capa Plata construida con éxito. Archivo: {ARCHIVO_SALIDA}")
+    logger.info("Capa Plata construida con éxito. Archivo: %s", ARCHIVO_SALIDA)
     return master_df
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%H:%M:%S')
     df_final = ejecutar_procesamiento()

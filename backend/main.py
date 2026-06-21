@@ -2,16 +2,21 @@ import argparse
 import logging
 import os
 import sys
+
+print("Cargando Astronomus...", flush=True)
+
 import uvicorn
 
 from src.data.ingestion import ejecutar_ingesta
 from src.data.processing import ejecutar_procesamiento
 from src.data.preparation import ejecutar_preparacion_target
+from src.models.train import ejecutar_entrenamiento_del_modelo
 
 '''
 HOLA
 Si estás leyendo esto es porque acabás de clonar el repo e intuitivamente te metiste al primer Main que viste.
 Este código se encarga de ejecutar el pipeline de la manera más amigable posible para que no tengas que ir archivo por archivo.
+Si esto nunca llegaste a leerlo y aún así ejecutaste el código, entonces muy posiblemente le pediste a la ia que lo ejecute por vos.
 '''
 
 # Configuración del logger principal
@@ -60,20 +65,22 @@ def levantar_servidor():
 def mostrar_menu_interactivo():
     """Muestra un menú amigable si el usuario corre el script sin argumentos."""
     print("\n" + "="*50)
-    print(" BIENVENIDO A ASTRONOMUS - GESTOR DE PIPELINE ")
+    print(" BIENVENIDO A ASTRONOMUS - ORQUESTADOR PRINCIPAL ")
     print("="*50)
     print("Seleccioná qué parte del proyecto querés ejecutar:")
-    print("  1. Ejecutar Pipeline de Datos Completo (Ingesta -> Plata -> Oro)")
+    print("  1. Ejecutar Pipeline de Datos Completo (Bronce -> Plata -> Oro)")
     print("  2. Ejecutar solo Ingesta (Capa Bronce)")
     print("  3. Ejecutar solo Procesamiento (Capa Plata)")
     print("  4. Ejecutar solo Preparación (Capa Oro)")
-    print("  5. Levantar Servidor Web (Interfaz 3D y API)")
+    print("  5. Entrenar Modelo (Autoencoder + IHP)")
+    print("  ---------------------------------------------")
+    print("  6. Levantar Servidor Web (Interfaz 3D y API)")
     print("  0. Salir")
     print("="*50)
-    
+
     while True:
-        
-        opcion = input("Ingresá un número (0-5): ")
+
+        opcion = input("Ingresá un número (0-6): ")
 
         if opcion == '1':
             print()
@@ -93,6 +100,10 @@ def mostrar_menu_interactivo():
             break
         elif opcion == '5':
             print()
+            ejecutar_entrenamiento_del_modelo()
+            break
+        elif opcion == '6':
+            print()
             levantar_servidor()
             break
         elif opcion == '0':
@@ -100,7 +111,7 @@ def mostrar_menu_interactivo():
             sys.exit(0)
             break
         else:
-            print("Opción no válida. DALE NO ES TAN DIFICIL ELEGIR UN NUMERO DEL 0 AL 5. ")
+            print("Opción no válida. DALE NO ES TAN DIFICIL ELEGIR UN NUMERO DEL 0 AL 6. ")
             continue
 
 if __name__ == "__main__":
@@ -110,6 +121,7 @@ if __name__ == "__main__":
     parser.add_argument('--ingest', action='store_true', help="Ejecuta solo la ingesta de datos.")
     parser.add_argument('--process', action='store_true', help="Ejecuta solo el procesamiento (Capa Plata).")
     parser.add_argument('--prepare', action='store_true', help="Ejecuta solo la preparación (Capa Oro).")
+    parser.add_argument('--train', action='store_true', help="Entrena el modelo (Autoencoder + IHP).")
     parser.add_argument('--serve', action='store_true', help="Levanta el servidor FastAPI y el frontend.")
     
     args = parser.parse_args()
@@ -123,6 +135,8 @@ if __name__ == "__main__":
         ejecutar_procesamiento()
     elif args.prepare:
         ejecutar_preparacion_target()
+    elif args.train:
+        ejecutar_entrenamiento_del_modelo()
     elif args.serve:
         levantar_servidor()
     else:

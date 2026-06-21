@@ -10,20 +10,18 @@ configurar_estilo()
 
 MAPA_CLASES = {
     0: '0 - Inhóspito',
-    1: '1 - Exótico',
-    2: '2 - Tierra 2.0 (Grial)',
+    1: '1 - Tierra 2.0 (Grial)',
 }
 COLORES_CLASES = {
     '0 - Inhóspito':          '#e0e0e0',
-    '1 - Exótico':            '#3498db',
-    '2 - Tierra 2.0 (Grial)': '#f1c40f',
+    '1 - Tierra 2.0 (Grial)': '#f1c40f',
 }
 
 
 def generar_pca() -> None:
     """
     Proyecta el espacio paramétrico de la Capa Oro a 2D mediante PCA.
-    Colorea cada punto según su clase target (Inhóspito / Exótico / Grial).
+    Colorea cada punto según su clase target (Inhóspito / Grial).
     """
     X_train = cargar_gold("X_train.csv")
     y_train = cargar_gold("y_train.csv")

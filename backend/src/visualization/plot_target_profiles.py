@@ -8,8 +8,8 @@ def generar_perfiles_clases():
     
     df = cargar_gold("dataset_preparado_ml.csv")
     df['target_class'] = df['target_class'].astype(int)
-    df['Clase'] = df['target_class'].map({0: '0 - Inhóspito', 1: '1 - Exótico', 2: '2 - Tierra 2.0'})
-    
+    df['Clase'] = df['target_class'].map({0: '0 - Inhóspito', 1: '1 - Tierra 2.0'})
+
     variables = {
         'pl_dens': ('Densidad Planetaria', 'g/cm³', (0, 15)),
         'pl_eqt': ('Temp. de Equilibrio', 'K', (0, 1500)),
@@ -17,8 +17,8 @@ def generar_perfiles_clases():
         'pl_insol': ('Insolación Estelar', 'Flujo Terrestre', (0, 5))
     }
 
-    colores = {'0 - Inhóspito': '#95a5a6', '1 - Exótico': '#3498db', '2 - Tierra 2.0': '#f1c40f'}
-    orden = ['0 - Inhóspito', '1 - Exótico', '2 - Tierra 2.0']
+    colores = {'0 - Inhóspito': '#95a5a6', '1 - Tierra 2.0': '#f1c40f'}
+    orden = ['0 - Inhóspito', '1 - Tierra 2.0']
 
     print("Generando gráficos individuales de perfilado...")
     for col, (titulo, unidad, limites) in variables.items():
