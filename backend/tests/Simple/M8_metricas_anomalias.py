@@ -10,7 +10,7 @@ RANKING/RECUPERACIÓN: ¿el modelo rankea arriba a los Griales (Tierra 2.0) cono
 que quedaron FUERA del entrenamiento (validación held-out)?
 
 Requiere haber corrido antes:
-    py backend/main.py --all
+    py main.py --all
     py backend/src/models/train.py        # genera ranking_anomalias.csv
 
 Ejecutar desde la RAÍZ del repo:
@@ -47,7 +47,7 @@ except Exception:
 RAIZ = Path(__file__).resolve().parents[3]
 BACKEND = RAIZ / "backend"
 sys.path.append(str(BACKEND))
-from src.visualization.config_plots import configurar_estilo  # noqa: E402
+from src.eda.config_plots import configurar_estilo  # noqa: E402
 
 RANKING = BACKEND / "artifacts" / "models" / "ranking_anomalias.csv"
 REPORTES = BACKEND / "reports"

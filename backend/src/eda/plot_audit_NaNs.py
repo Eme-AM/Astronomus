@@ -1,15 +1,8 @@
-import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.patches import Patch
-
-# Rutas de datos
-DIR_ARCHIVE = "backend/data/archive"
-DIR_FIGURAS = "backend/reports/figures"
-os.makedirs(DIR_FIGURAS, exist_ok=True)
-
-sns.set_theme(style="whitegrid", context="paper", font_scale=1.2)
+from config_plots import configurar_estilo, guardar_figura, DIR_ARCHIVE, DIR_FIGURAS
 
 def obtener_datos_faltantes() -> dict:
     """
@@ -17,7 +10,7 @@ def obtener_datos_faltantes() -> dict:
     Si el archivo no existe, utiliza los valores hardcodeados como respaldo.
     """
 
-    ruta_v1 = f"{DIR_ARCHIVE}/V1_data_lake_consolidado.csv"
+    ruta_v1 = DIR_ARCHIVE / "V1_data_lake_consolidado.csv"
     
     # Las columnas que queremos auditar en el gráfico
     columnas_objetivo = [
@@ -27,7 +20,7 @@ def obtener_datos_faltantes() -> dict:
         'st_teff', 'pl_dens', 'pl_rade', 'pl_bmasse', 'st_mass'
     ]
 
-    if os.path.exists(ruta_v1):
+    if ruta_v1.exists():
         print(f"Calculando porcentajes de nulos dinámicamente desde {ruta_v1}...")
         df_v1 = pd.read_csv(ruta_v1, low_memory=False)
         
@@ -49,6 +42,7 @@ def obtener_datos_faltantes() -> dict:
 
 def generar_graficos_auditoria():
     print("Generando auditoría visual de datos faltantes y linaje...")
+    configurar_estilo()
     
     # ==========================================
     # 1. Gráfico de Barras Horizontales (Dinámico)
@@ -83,16 +77,15 @@ def generar_graficos_auditoria():
     plt.legend(handles=leyenda_elementos, loc='lower right', fontsize=11)
     sns.despine()
     
-    ruta_barras = f'{DIR_FIGURAS}/auditoria_barras.png'
     plt.tight_layout()
-    plt.savefig(ruta_barras, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f" ✓ Gráfico guardado en: {ruta_barras}")
+    guardar_figura('auditoria_barras.png')
 
     # ==========================================
     # 2. Gráfico de Dona (Linaje de Rescate)
     # ==========================================
-    # Este se mantiene manual porque requiere los totales del pipeline final
+    # TODO: data_linaje está hardcodeado con valores de una ejecución pasada del pipeline.
+    # Si el dataset crece, el gráfico de dona refleja números incorrectos. Idealmente estos
+    # totales deberían leerse de un artefacto generado por processing.py (ej. un JSON de métricas).
     data_linaje = {'ML (MICE)': 7089, 'Leyes Físicas': 576, 'Cruce de Catálogos': 113}
     
     plt.figure(figsize=(8, 8))
@@ -106,11 +99,8 @@ def generar_graficos_auditoria():
     plt.title(f'Linaje de Rescate de Datos\n(Total: {sum(data_linaje.values()):,} valores recuperados)'.replace(',', '.'), 
               fontweight='bold', fontsize=14, pad=20)
     
-    ruta_dona = f'{DIR_FIGURAS}/auditoria_linaje.png'
     plt.tight_layout()
-    plt.savefig(ruta_dona, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f" ✓ Gráfico guardado en: {ruta_dona}")
+    guardar_figura('auditoria_linaje.png')
 
 if __name__ == "__main__":
     generar_graficos_auditoria()

@@ -23,8 +23,8 @@ def generar_auditoria_orbital():
     plt.ylim(-0.05, 1.05) 
 
     # Corrección de renderizado logarítmico: Inicio en 0.1 en lugar de 0
-    plt.axvspan(0.1, 5, ymin=0.5, ymax=1, color='red', alpha=0.15)
-    plt.text(0.7, 0.8, 'Zona de Circularización\n(Debería estar vacía)', 
+    plt.axvspan(0.1, 5, ymin=0, ymax=1, color='red', alpha=0.15)
+    plt.text(0.7, 0.8, 'Zona de Circularización\n(Debería estar vacía)',
              color='red', fontsize=11, fontweight='bold', ha='center')
 
     plt.title('Auditoría de Mecánica Orbital: Período vs. Excentricidad\n(Verificación de Leyes de Kepler)', 
@@ -33,7 +33,6 @@ def generar_auditoria_orbital():
     plt.ylabel('Excentricidad de la Órbita', fontsize=13)
     
     guardar_figura('eda_05_mecanica_orbital.png')
-    print(" ✓ Gráfico guardado en: reports/figures/eda_05_mecanica_orbital.png")
 
 if __name__ == "__main__":
     generar_auditoria_orbital()

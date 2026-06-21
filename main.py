@@ -3,6 +3,8 @@ import logging
 import os
 import sys
 
+sys.path.insert(0, "backend")
+
 print("Cargando Astronomus...", flush=True)
 
 import uvicorn

@@ -5,9 +5,6 @@ from sklearn.decomposition import PCA
 
 from config_plots import configurar_estilo, cargar_gold, guardar_figura
 
-# Estilo aplicado a nivel de módulo — consistente con el resto de la suite
-configurar_estilo()
-
 MAPA_CLASES = {
     0: '0 - Inhóspito',
     1: '1 - Tierra 2.0 (Grial)',
@@ -23,6 +20,7 @@ def generar_pca() -> None:
     Proyecta el espacio paramétrico de la Capa Oro a 2D mediante PCA.
     Colorea cada punto según su clase target (Inhóspito / Grial).
     """
+    configurar_estilo()
     X_train = cargar_gold("X_train.csv")
     y_train = cargar_gold("y_train.csv")
 

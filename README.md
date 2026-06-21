@@ -118,19 +118,7 @@ El frontend es una aplicación WebGL en tiempo real que visualiza el catálogo c
 ```text
 ASTRONOMUS/
 ├── main.py               # Orquestador principal (menú interactivo y flags CLI)
-├── frontend/             # Visor 3D interactivo (WebGL + MediaPipe)
-│   ├── index.html        # Shell HTML con importmap para Three.js
-│   ├── css/
-│   │   └── astronomus.css
-│   └── js/
-│       ├── main.js       # Punto de entrada: inicializa módulos en orden
-│       ├── state.js      # Singleton de estado global compartido
-│       ├── scene.js      # Renderer, cámara, bloom y controles orbitales
-│       ├── catalog.js    # Carga el catálogo desde la API y crea los puntos 3D
-│       ├── interaction.js # Raycasting, animación y listeners de mouse
-│       └── handtracking.js # MediaPipe Hands: gestos de rotar, apuntar, zoom y clic
 ├── backend/
-│   ├── main.py           # Alias de ejecución (importado por el orquestador raíz)
 │   ├── requirements.txt  # Dependencias Python
 │   ├── data/             # Data Lake Local (ignorado en versionado)
 │   │   ├── raw/          # Capa Bronce: descargas intocables
@@ -146,9 +134,18 @@ ASTRONOMUS/
 │       ├── core/         # Fórmulas y leyes astrofísicas (physics.py)
 │       ├── data/         # Pipeline ELT (ingestion.py, processing.py, preparation.py)
 │       ├── models/       # Autoencoder de anomalías y scripts de entrenamiento
-│       └── visualization/ # Suite de diagnóstico y auditoría MLOps
-├── docs/
-│   └── FRONTEND_REFACTORING.md  # Detalle técnico del frontend vs. commit de referencia
+│       └── eda/          # Suite de diagnóstico y auditoría MLOps
+├── frontend/             # Visor 3D interactivo (WebGL + MediaPipe)
+│   ├── index.html        # Shell HTML con importmap para Three.js
+│   ├── css/
+│   │   └── astronomus.css
+│   └── js/
+│       ├── main.js       # Punto de entrada: inicializa módulos en orden
+│       ├── state.js      # Singleton de estado global compartido
+│       ├── scene.js      # Renderer, cámara, bloom y controles orbitales
+│       ├── catalog.js    # Carga el catálogo desde la API y crea los puntos 3D
+│       ├── interaction.js # Raycasting, animación y listeners de mouse
+│       └── handtracking.js # MediaPipe Hands: gestos de rotar, apuntar, zoom y clic
 ├── .gitignore
 └── README.md
 ```

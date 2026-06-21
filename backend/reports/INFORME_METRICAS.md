@@ -9,7 +9,7 @@ Habitabilidad Planetaria).
 > Documento único: contiene todas las métricas del apunte (Clase #8) con sus tablas y gráficos.
 > Los `.csv` y el `.txt` en esta carpeta son la exportación cruda de estos mismos números.
 
-**Qué se hizo en la sesión:** (1) se generó la Capa Oro (`py backend/main.py --all`); (2) se
+**Qué se hizo en la sesión:** (1) se generó la Capa Oro (`py main.py --all`); (2) se
 corrió el modelo real (`py backend/src/models/train.py` → `ranking_anomalias.csv` +
 `astronomus_ae.pth`); (3) se escribió `backend/tests/Simple/M8_metricas_anomalias.py`, que
 calcula y exporta todas las métricas de validación apropiadas para un modelo de **ranking**.
@@ -134,7 +134,7 @@ ingeniería de features físicos más que en el deep learning.
 
 ```powershell
 # (rama Sandbox-metricas, desde la raíz, con .venv activado)
-py backend/main.py --all                              # Capa Oro (X_scaled.csv, y.csv)
+py main.py --all                              # Capa Oro (X_scaled.csv, y.csv)
 py backend/src/models/train.py                        # modelo -> ranking_anomalias.csv
 py backend/tests/Simple/M8_metricas_anomalias.py      # genera este informe (CSVs + figuras)
 ```

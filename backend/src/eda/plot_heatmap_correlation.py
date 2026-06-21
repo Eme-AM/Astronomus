@@ -31,7 +31,6 @@ def generar_heatmap():
               fontsize=16, fontweight='bold', pad=20)
 
     guardar_figura('eda_01_heatmap_correlacion.png')
-    print(" ✓ Gráfico guardado en: reports/figures/eda_01_heatmap_correlacion.png")
 
 if __name__ == "__main__":
     generar_heatmap()

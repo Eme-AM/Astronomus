@@ -9,6 +9,13 @@ def generar_perfiles_clases():
     df = cargar_gold("dataset_preparado_ml.csv")
     df['target_class'] = df['target_class'].astype(int)
     df['Clase'] = df['target_class'].map({0: '0 - Inhóspito', 1: '1 - Tierra 2.0'})
+    if df['Clase'].isna().any():
+        clases_huerfanas = df.loc[df['Clase'].isna(), 'target_class'].unique()
+        raise ValueError(
+            f"El mapa de clases no cubre {df['Clase'].isna().sum()} filas. "
+            f"Valores sin mapear: {clases_huerfanas}. "
+            f"Actualizá el mapa de clases en {__file__}."
+        )
 
     variables = {
         'pl_dens': ('Densidad Planetaria', 'g/cm³', (0, 15)),

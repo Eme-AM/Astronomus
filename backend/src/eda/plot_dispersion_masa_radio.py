@@ -37,7 +37,6 @@ def generar_scatter_astrofisico():
 
     # Delegamos el guardado (despine, savefig, close)
     guardar_figura('eda_02_dispersion_masa_radio.png')
-    print(" ✓ Gráfico guardado en: reports/figures/eda_02_dispersion_masa_radio.png")
 
 if __name__ == "__main__":
     generar_scatter_astrofisico()
