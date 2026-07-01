@@ -1,6 +1,6 @@
-# Astronomus: Deep Learning para la Clasificación de Exoplanetas
+# Astronomus: Detección de Anomalías y Ranking de Habitabilidad en Exoplanetas
 
-**Astronomus** es un proyecto integral de Ciencia e Ingeniería de Datos diseñado para predecir y clasificar la habitabilidad de exoplanetas. El proyecto combina astrofísica teórica, procesamiento espacial de datos y algoritmos avanzados de Machine Learning para consolidar y analizar información de los principales observatorios del mundo, y lo expone mediante un visor 3D interactivo controlado por gestos de mano en tiempo real.
+**Astronomus** es un proyecto integral de Ciencia e Ingeniería de Datos diseñado para rankear y priorizar candidatos a súper-habitabilidad entre exoplanetas conocidos. El proyecto combina astrofísica teórica, procesamiento espacial de datos y algoritmos de Machine Learning no supervisado para consolidar y analizar información de los principales observatorios del mundo, y lo expone mediante un visor 3D interactivo controlado por gestos de mano en tiempo real.
 
 ---
 
@@ -23,21 +23,7 @@ El orquestador principal está en la raíz del repositorio:
 python main.py
 ```
 
-Se presenta un menú interactivo para elegir qué parte ejecutar. Para usuarios avanzados, se pueden usar flags directamente:
-
-| Flag | Acción |
-|---|---|
-| `--all` | Ejecuta el pipeline de datos completo (Bronce → Plata → Oro) |
-| `--ingest` | Solo ingesta de datos (Capa Bronce) |
-| `--process` | Solo procesamiento y consolidación (Capa Plata) |
-| `--prepare` | Solo preparación de tensores (Capa Oro) |
-| `--serve` | Levanta el servidor FastAPI + visor 3D en `http://localhost:8000` |
-
-```bash
-# Ejemplos
-python main.py --all    # Construir el Data Lake desde cero
-python main.py --serve  # Lanzar la interfaz 3D
-```
+Se presenta un menú interactivo para elegir qué parte ejecutar.
 
 ---
 
@@ -47,7 +33,7 @@ El flujo de datos sigue un paradigma **ELT (Extract, Load, Transform)** estructu
 
 1. **Capa Bronce (`backend/data/raw/`):** Ingesta cruda y directa a disco físico (*Import-Safe*). Se preservan los metadatos y la varianza original sin intervención temprana.
 2. **Capa Plata (`backend/data/silver/`):** Consolidación multi-fuente mediante resolución espacial 3D, imputación termodinámica y algoritmos de bosque aleatorio, generando un único catálogo maestro libre de valores nulos.
-3. **Capa Oro (`backend/data/gold/`):** Vectores matemáticos procesados. Incluye *Target Engineering* multiclase, partición estratificada y escalado robusto, listos para la Red Neuronal.
+3. **Capa Oro (`backend/data/gold/`):** Vectores matemáticos procesados. Incluye Target Engineering multiclase, transformación logarítmica de variables asimétricas y escalado robusto (RobustScaler fiteado exclusivamente sobre las clases etiquetadas normales), listos para el modelo no supervisado.
 
 ---
 
@@ -55,32 +41,34 @@ El flujo de datos sigue un paradigma **ELT (Extract, Load, Transform)** estructu
 
 Para lograr una validación cruzada y enriquecer el espacio de características (*feature space*), el Data Lake ingesta dinámicamente tres repositorios:
 
-*   **NASA Exoplanet Archive (`pscomppars`):** Utilizado como fuente primaria (Ground Truth). Aporta parámetros orbitales precisos (excentricidad, período) y datos estelares (edad, metalicidad).
-*   **The Extrasolar Planets Encyclopaedia (Observatorio de París):** Utilizado para inyectar volumen y rellenar características físicas mediante fusión de datos (*Cross-filling*).
-*   **Planetary Habitability Laboratory (Arecibo - PHL):** Extraído vía Kaggle API. Provee las etiquetas categóricas de validación externa precalculadas por astrofísicos: **Earth Similarity Index (ESI)** y estado de **Habitabilidad**.
+- **NASA Exoplanet Archive (`pscomppars`):** Fuente primaria de parámetros orbitales y estelares (excentricidad, período, temperatura estelar, metalicidad, edad). Aporta la mayor cobertura de planetas confirmados.
+- **The Extrasolar Planets Encyclopaedia (Observatorio de París):** Utilizado para inyectar volumen y rellenar características físicas mediante fusión de datos (*Cross-filling*).
+- **Planetary Habitability Laboratory (Arecibo - PHL):** Extraído vía Kaggle API. Provee las etiquetas de validación externa calculadas por astrofísicos: **Earth Similarity Index (ESI)** y estado de **Habitabilidad**. Constituye el ground truth de habitabilidad del proyecto.
 
 ---
 
 ## Pipeline de Procesamiento y Data Quality
 
-### 1. Entity Resolution Espacial (Fuzzy Matching)
+### 1. Entity Resolution Espacial (Matching Geométrico por KD-Tree)
 Ante la carencia de una nomenclatura universal, se implementó un algoritmo **K-D Tree** (`scipy.spatial.cKDTree`). Para evitar la distorsión polar de las coordenadas celestes (Ascensión Recta y Declinación), se proyectan a vectores unitarios 3D utilizando la **Distancia de Cuerda**. El cruce resuelve colisiones dinámicamente mediante una política de *Closest-Wins*, asegurando la asignación del gemelo espacial más preciso dentro de un margen de $0.01^\circ$.
 
 ### 2. Imputación Híbrida de 3 Niveles
 Se rechazó la imputación por fuerza bruta para evitar la alteración de la varianza astrofísica. El rescate de datos opera en tres fases:
-* **Fase Empírica (Cross-Filling):** Inyección de observaciones cruzadas desde catálogos europeos.
-* **Fase Determinista (Física):** Deducción exacta de la Temperatura de Equilibrio e Insolación mediante derivaciones de la Ley de Stefan-Boltzmann ($T_{eq} \propto S^{1/4}$).
-* **Fase Estocástica (Machine Learning):** Algoritmo **MICE** (*Multiple Imputation by Chained Equations*) impulsado por un `ExtraTreesRegressor`, mitigando el sobreajuste mediante divisiones extremas aleatorias.
+- **Fase Empírica (Cross-Filling):** Inyección de observaciones cruzadas desde catálogos europeos.
+- **Fase Determinista (Física):** Deducción exacta de la Temperatura de Equilibrio e Insolación mediante derivaciones de la Ley de Stefan-Boltzmann ($T_{eq} \propto S^{1/4}$).
+- **Fase Estocástica (Machine Learning):** Algoritmo **MICE** (*Multiple Imputation by Chained Equations*) impulsado por un `ExtraTreesRegressor`, mitigando el sobreajuste mediante divisiones extremas aleatorias.
 
 ### 3. Target Engineering: El Súper Target
-La clasificación de habitabilidad no se basa en un solo parámetro plano. Se construyó un objetivo multiclase combinando el estado de la Zona Habitable (*Goldilocks Zone*) y un exigente umbral en el *Earth Similarity Index* ($ESI \ge 0.80$), categorizando el universo en cuatro clases:
+La habitabilidad no se basa en un solo parámetro plano. Se construyó un objetivo multiclase combinando el estado de la Zona Habitable (*Goldilocks Zone*) y un umbral en el *Earth Similarity Index* ($ESI \ge 0.75$), categorizando el universo en cuatro categorías:
 
 | Clase | Etiqueta | Descripción |
 |---|---|---|
-| `0` | Mundo Inhóspito | Condiciones extremas, gigante gaseoso o roca estéril |
-| `1` | Mundo Exótico | Composición anómala o atmósfera densa inusual |
-| `2` | Tierra 2.0 (Grial) | Zona habitable + ESI ≥ 0.80, candidato a agua líquida |
-| `3` | Hallazgo IA | Alto IHP detectado por el modelo, pendiente de confirmación |
+| `-1` | Huérfano | Sin etiqueta PHL — planeta del catálogo NASA/EU no presente en el PHL. Representa el 56% del dataset. |
+| `0` | Inhóspito | Etiquetado por PHL como no habitable. Condiciones extremas, gigante gaseoso o roca estéril. |
+| `1` | Tierra 2.0 (Grial) | Etiquetado por PHL como habitable con ESI ≥ 0.75. Candidato a agua líquida superficial. 15 planetas confirmados. |
+| `2`* | Hallazgo IA | Alto IHP detectado por el modelo entre planetas sin etiqueta PHL, pendiente de confirmación observacional. 9 candidatos. |
+
+*La clase 2 (Hallazgo IA) no forma parte del Súper Target de entrenamiento: es asignada por el modelo en la etapa de pseudo-etiquetado, después del ranking.
 
 El **Índice de Habitabilidad del Planeta (IHP)** se calcula combinando el score del modelo de anomalías (`score_ia`) con el score del índice de Heller (`score_heller`) para producir una métrica de confianza unificada.
 
@@ -123,7 +111,7 @@ ASTRONOMUS/
 │   ├── data/             # Data Lake Local (ignorado en versionado)
 │   │   ├── raw/          # Capa Bronce: descargas intocables
 │   │   ├── silver/       # Capa Plata: catálogo consolidado
-│   │   └── gold/         # Capa Oro: tensores escalados y estratificados
+│   │   └── gold/         # Capa Oro: tensores escalados
 │   ├── artifacts/        # Modelos entrenados y escaladores (.pkl, .pth)
 │   ├── reports/
 │   │   └── figures/      # Gráficos de calidad (EDA, métricas, matrices de confusión)
