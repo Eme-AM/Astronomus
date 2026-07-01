@@ -27,6 +27,16 @@ Se presenta un menú interactivo para elegir qué parte ejecutar.
 
 ---
 
+## Dependencias principales
+
+```bash
+pip install -r backend/requirements.txt
+```
+
+El frontend no tiene dependencias locales: Three.js y MediaPipe se cargan desde CDN en el navegador.
+
+---
+
 ## Arquitectura de Datos (Patrón Medallón)
 
 El flujo de datos sigue un paradigma **ELT (Extract, Load, Transform)** estructurado en tres capas estrictas para garantizar la trazabilidad y sanidad de la información:
@@ -138,12 +148,3 @@ ASTRONOMUS/
 └── README.md
 ```
 
----
-
-## Dependencias principales
-
-```bash
-pip install -r backend/requirements.txt
-```
-
-El frontend no tiene dependencias locales: Three.js y MediaPipe se cargan desde CDN en el navegador.
